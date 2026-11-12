@@ -1,0 +1,12 @@
+.DS_Store
+.build/
+Packages/ShengXiaCore/.build/
+.swiftpm/
+build/
+DerivedData/
+*.ipa
+Payload/
+xcuserdata/
+*.xcuserstate
+*.xcodeproj
+*.xcworkspace
