@@ -147,7 +147,7 @@ struct EmptyLibrary: View {
             Text("匣子还是空的")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(SX.ink)
-            Text("粘贴哔哩哔哩或抖音的视频链接。声匣会把整条音轨存进本机，不会做人声分离，也不会去碰付费音乐库。")
+            Text("粘贴哔哩哔哩、抖音或 YouTube 的视频链接。声匣会把整条音轨存进本机，不会做人声分离，也不会去碰付费音乐库。")
                 .font(.subheadline)
                 .foregroundStyle(SX.ink.opacity(0.7))
                 .fixedSize(horizontal: false, vertical: true)

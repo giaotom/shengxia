@@ -19,6 +19,16 @@ public enum ResolveError: Error, Equatable, LocalizedError, Sendable {
     case douyinImagePost
     case douyinResolveFailed
     case douyinWrongVideo
+    case youtubeConnectionFailed
+    case youtubeResolveFailed
+    case youtubeAgeRestricted
+    case youtubePrivate
+    case youtubeMembersOnly
+    case youtubeUnavailable
+    case youtubeRegionBlocked
+    case youtubeNoAudio
+    case youtubeLiveUnsupported
+    case youtubeNotAVideo
     case network(String)
     case badResponse(String)
 
@@ -27,7 +37,7 @@ public enum ResolveError: Error, Equatable, LocalizedError, Sendable {
         case .emptyInput:
             return "请先粘贴链接"
         case .unsupportedLink:
-            return "暂时只支持哔哩哔哩和抖音的视频链接"
+            return "暂时只支持哔哩哔哩、抖音和 YouTube 的视频链接"
         case .bilibiliBanned:
             return "哔哩哔哩拒绝了请求，请稍后再试"
         case .bilibiliNotFound:
@@ -60,6 +70,26 @@ public enum ResolveError: Error, Equatable, LocalizedError, Sendable {
             return "抖音解析失败，可能是抖音更新了校验"
         case .douyinWrongVideo:
             return "抖音打开了别的视频，已停止保存"
+        case .youtubeConnectionFailed:
+            return "YouTube 连接失败，请确认手机已开启代理"
+        case .youtubeResolveFailed:
+            return "YouTube 解析失败，可能是风控更新"
+        case .youtubeAgeRestricted:
+            return "这个视频有年龄限制，声匣不会绕过登录验证"
+        case .youtubePrivate:
+            return "这个视频是私密的，无法提取"
+        case .youtubeMembersOnly:
+            return "这个视频仅限频道会员，声匣不会绕过会员墙"
+        case .youtubeUnavailable:
+            return "视频不存在或已被删除"
+        case .youtubeRegionBlocked:
+            return "这个视频在当前地区不可用"
+        case .youtubeNoAudio:
+            return "没有找到 iPhone 能播放的 AAC 音轨"
+        case .youtubeLiveUnsupported:
+            return "暂不支持 YouTube 直播"
+        case .youtubeNotAVideo:
+            return "没有在这段链接里找到 YouTube 视频"
         case .network(let message):
             return "网络出错：\(message)"
         case .badResponse(let message):

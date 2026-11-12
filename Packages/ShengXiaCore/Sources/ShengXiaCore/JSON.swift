@@ -35,6 +35,16 @@ enum JSON {
         return nil
     }
 
+    static func bool(_ dict: [String: Any], _ key: String) -> Bool? {
+        if let value = dict[key] as? Bool { return value }
+        if let number = dict[key] as? NSNumber { return number.boolValue }
+        if let text = dict[key] as? String {
+            if text == "true" { return true }
+            if text == "false" { return false }
+        }
+        return nil
+    }
+
     static func double(_ dict: [String: Any], _ key: String) -> Double? {
         if let value = dict[key] as? Double { return value }
         if let number = dict[key] as? NSNumber { return number.doubleValue }

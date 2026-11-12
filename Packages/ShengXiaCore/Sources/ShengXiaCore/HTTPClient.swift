@@ -62,4 +62,27 @@ enum HTTP {
             throw ResolveError.network(error.localizedDescription)
         }
     }
+
+    static func post(
+        _ url: URL,
+        body: Data,
+        headers: [String: String],
+        timeout: TimeInterval = 25,
+        client: any HTTPClient
+    ) async throws -> HTTPResponse {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = body
+        request.timeoutInterval = timeout
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        do {
+            return try await client.send(request)
+        } catch let error as ResolveError {
+            throw error
+        } catch {
+            throw ResolveError.network(error.localizedDescription)
+        }
+    }
 }

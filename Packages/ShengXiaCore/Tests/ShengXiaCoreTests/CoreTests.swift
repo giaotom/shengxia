@@ -258,9 +258,215 @@ final class RouterTests: XCTestCase {
             XCTFail("未知站点应失败")
         } catch let error as ResolveError {
             XCTAssertEqual(error, .unsupportedLink)
-            XCTAssertEqual(error.errorDescription, "暂时只支持哔哩哔哩和抖音的视频链接")
+            XCTAssertEqual(error.errorDescription, "暂时只支持哔哩哔哩、抖音和 YouTube 的视频链接")
         } catch {
             XCTFail("意外错误 \(error)")
         }
+    }
+}
+
+final class YouTubeTests: XCTestCase {
+    func testParsesWatchShortsMusicAndShareText() {
+        let samples: [(String, String)] = [
+            ("https://www.youtube.com/watch?v=jNQXAC9IVRw", "jNQXAC9IVRw"),
+            ("https://www.youtube.com/watch?v=jNQXAC9IVRw&t=30s&list=PL123", "jNQXAC9IVRw"),
+            ("https://youtu.be/jNQXAC9IVRw", "jNQXAC9IVRw"),
+            ("https://youtu.be/jNQXAC9IVRw?t=12", "jNQXAC9IVRw"),
+            ("https://www.youtube.com/shorts/dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("https://m.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("https://music.youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ", "dQw4w9WgXcQ"),
+            ("看看这首 https://youtu.be/dQw4w9WgXcQ 复制打开", "dQw4w9WgXcQ")
+        ]
+        let source = YouTubeSource()
+        for (text, expected) in samples {
+            let urls = LinkParser.extractURLs(from: text)
+            XCTAssertEqual(LinkParser.youtubeID(in: urls[0]), expected, text)
+            XCTAssertTrue(source.canHandle(text), text)
+        }
+        XCTAssertFalse(source.canHandle("https://www.bilibili.com/video/BV1hrW367Emp"))
+        XCTAssertFalse(source.canHandle("BV1GJ411x7h7"))
+        XCTAssertTrue(source.canHandle("https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxxxxxxxx"))
+        XCTAssertNil(LinkParser.youtubeID(in: URL(string: "https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxxxxxxxx")!))
+        XCTAssertEqual(SourceRouter().pick("标题 https://youtu.be/dQw4w9WgXcQ 完")?.id, "youtube")
+        XCTAssertEqual(SourceRouter().pick("https://youtu.be/dQw4w9WgXcQ https://v.douyin.com/abc/")?.id, "youtube")
+    }
+
+    func testPrefersItag140OverOpusAndHigherAAC() throws {
+        let json = playerJSON(formats: """
+        [
+          {"itag":251,"mimeType":"audio/webm; codecs=\\"opus\\"","bitrate":200000,"url":"https://cdn.example/opus.webm"},
+          {"itag":141,"mimeType":"audio/mp4; codecs=\\"mp4a.40.2\\"","bitrate":256000,"signatureCipher":"s=abc"},
+          {"itag":139,"mimeType":"audio/mp4; codecs=\\"mp4a.40.5\\"","bitrate":49000,"url":"https://cdn.example/low.m4a"},
+          {"itag":140,"mimeType":"audio/mp4; codecs=\\"mp4a.40.2\\"","bitrate":130677,"url":"https://cdn.example/140.m4a"}
+        ]
+        """)
+        let result = try YouTubeParser.parse(json, videoID: "dQw4w9WgXcQ", headers: ["User-Agent": "test"])
+        guard case .ready(let media) = result else { return XCTFail("\(result)") }
+        XCTAssertEqual(media.title, "示例标题")
+        XCTAssertEqual(media.author, "示例作者")
+        XCTAssertEqual(media.duration, 213)
+        XCTAssertEqual(media.sourceName, "YouTube")
+        XCTAssertEqual(media.pageURL, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        XCTAssertEqual(media.coverURL?.absoluteString, "https://i.ytimg.com/vi/dQw4w9WgXcQ/hq720.jpg")
+        XCTAssertEqual(media.stream.kind, .audio)
+        XCTAssertEqual(media.stream.fileExtension, "m4a")
+        XCTAssertEqual(media.stream.formatLabel, "M4A（AAC）")
+        XCTAssertEqual(media.stream.urls.map(\.absoluteString), ["https://cdn.example/140.m4a"])
+        XCTAssertEqual(media.stream.headers["Referer"], nil)
+        XCTAssertEqual(media.stream.headers["User-Agent"], "test")
+    }
+
+    func testFallsBackToBestAACThenMuxedMP4() throws {
+        let higher = try YouTubeParser.parse(
+            playerJSON(formats: """
+            [
+              {"itag":139,"mimeType":"audio/mp4; codecs=\\"mp4a.40.5\\"","bitrate":49000,"url":"https://cdn.example/low.m4a"},
+              {"itag":256,"mimeType":"audio/mp4; codecs=\\"mp4a.40.2\\"","bitrate":180000,"url":"https://cdn.example/hi.m4a"}
+            ]
+            """),
+            videoID: "dQw4w9WgXcQ",
+            headers: [:]
+        )
+        guard case .ready(let aac) = higher else { return XCTFail("\(higher)") }
+        XCTAssertEqual(aac.stream.urls.first?.absoluteString, "https://cdn.example/hi.m4a")
+
+        let muxed = try YouTubeParser.parse(
+            playerJSON(adaptive: "[]", formats: """
+            [
+              {"itag":22,"mimeType":"video/mp4; codecs=\\"avc1.64001F, mp4a.40.2\\"","bitrate":700000,"url":"https://cdn.example/22.mp4"},
+              {"itag":18,"mimeType":"video/mp4; codecs=\\"avc1.42001E, mp4a.40.2\\"","bitrate":300000,"url":"https://cdn.example/18.mp4"}
+            ]
+            """),
+            videoID: "dQw4w9WgXcQ",
+            headers: [:]
+        )
+        guard case .ready(let video) = muxed else { return XCTFail("\(muxed)") }
+        XCTAssertEqual(video.stream.kind, .video)
+        XCTAssertEqual(video.stream.fileExtension, "mp4")
+        XCTAssertEqual(video.stream.urls.first?.absoluteString, "https://cdn.example/18.mp4")
+    }
+
+    func testRejectsWebMOnlyAndClassifiesPlayability() throws {
+        let webm = try YouTubeParser.parse(
+            playerJSON(formats: #"[{"itag":251,"mimeType":"audio/webm; codecs=\"opus\"","bitrate":160000,"url":"https://cdn.example/a.webm"}]"#),
+            videoID: "dQw4w9WgXcQ",
+            headers: [:]
+        )
+        guard case .noAudio = webm else { return XCTFail("\(webm)") }
+
+        try assertPlayability("LOGIN_REQUIRED", reason: "Sign in to confirm your age", equals: .youtubeAgeRestricted)
+        try assertPlayability("LOGIN_REQUIRED", reason: "Sign in to confirm you’re not a bot", retry: true)
+        try assertPlayability("UNPLAYABLE", reason: "This video is private.", equals: .youtubePrivate)
+        try assertPlayability("UNPLAYABLE", reason: "This video is available to this channel's members on level: test", equals: .youtubeMembersOnly)
+        try assertPlayability("ERROR", reason: "This video is unavailable", equals: .youtubeUnavailable)
+        try assertPlayability("UNPLAYABLE", reason: "The uploader has not made this video available in your country", equals: .youtubeRegionBlocked)
+        try assertPlayability("LIVE_STREAM", reason: "This live event will begin in a few moments.", equals: .youtubeLiveUnsupported)
+        XCTAssertEqual(ResolveError.youtubeConnectionFailed.errorDescription, "YouTube 连接失败，请确认手机已开启代理")
+        XCTAssertEqual(ResolveError.youtubeResolveFailed.errorDescription, "YouTube 解析失败，可能是风控更新")
+    }
+
+    func testResolveFallsBackWhenFirstClientIsBotChecked() async throws {
+        let client = ScriptedHTTPClient()
+        client.handlers = [
+            { request in
+                let body = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+                XCTAssertEqual(request.httpMethod, "POST")
+                XCTAssertTrue(request.url?.path.contains("/youtubei/v1/player") == true)
+                XCTAssertTrue(body.contains("VISIONOS"))
+                XCTAssertTrue(body.contains("dQw4w9WgXcQ"))
+                return HTTPResponse(statusCode: 200, finalURL: request.url, data: Data(
+                    #"{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm you’re not a bot"}}"#.utf8
+                ))
+            },
+            { request in
+                let body = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+                XCTAssertTrue(body.contains("ANDROID_VR"))
+                return HTTPResponse(
+                    statusCode: 200,
+                    finalURL: request.url,
+                    data: self.playerJSON(formats: #"[{"itag":140,"mimeType":"audio/mp4; codecs=\"mp4a.40.2\"","bitrate":130677,"url":"https://cdn.example/140.m4a"}]"#)
+                )
+            }
+        ]
+        let step = try await YouTubeSource().resolve("https://youtu.be/dQw4w9WgXcQ", client: client)
+        guard case .ready(let media) = step else { return XCTFail("\(step)") }
+        XCTAssertEqual(media.stream.urls.first?.absoluteString, "https://cdn.example/140.m4a")
+        XCTAssertEqual(media.stream.headers["User-Agent"], YouTubeClients.androidVRUserAgent)
+        XCTAssertEqual(media.stream.headers["Referer"], "https://www.youtube.com/")
+        XCTAssertTrue(client.handlers.isEmpty)
+    }
+
+    func testAgeRestrictionDoesNotTryAnotherClient() async {
+        let client = ScriptedHTTPClient()
+        client.handlers = [
+            { _ in
+                HTTPResponse(statusCode: 200, finalURL: nil, data: Data(
+                    #"{"playabilityStatus":{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm your age"}}"#.utf8
+                ))
+            }
+        ]
+        do {
+            _ = try await YouTubeSource().resolve("https://www.youtube.com/watch?v=Tq92D6wQ1mg", client: client)
+            XCTFail("年龄限制应失败")
+        } catch let error as ResolveError {
+            XCTAssertEqual(error, .youtubeAgeRestricted)
+            XCTAssertEqual(client.handlers.count, 0)
+        } catch {
+            XCTFail("意外错误 \(error)")
+        }
+    }
+
+    func testConnectionFailureAndMissingVideoID() async {
+        do {
+            _ = try await YouTubeSource().resolve("https://www.youtube.com/playlist?list=PLxxxxxxxxxxxxxxxxxxxxxx", client: ScriptedHTTPClient())
+            XCTFail("播放列表应失败")
+        } catch let error as ResolveError {
+            XCTAssertEqual(error, .youtubeNotAVideo)
+        } catch {
+            XCTFail("意外错误 \(error)")
+        }
+        do {
+            _ = try await YouTubeSource().resolve("https://youtu.be/dQw4w9WgXcQ", client: OfflineHTTPClient())
+            XCTFail("断网应失败")
+        } catch let error as ResolveError {
+            XCTAssertEqual(error, .youtubeConnectionFailed)
+        } catch {
+            XCTFail("意外错误 \(error)")
+        }
+    }
+
+    private func assertPlayability(
+        _ status: String,
+        reason: String,
+        equals expected: ResolveError? = nil,
+        retry: Bool = false
+    ) throws {
+        let data = Data(#"{"playabilityStatus":{"status":"\#(status)","reason":"\#(reason)"}}"#.utf8)
+        do {
+            let result = try YouTubeParser.parse(data, videoID: "dQw4w9WgXcQ", headers: [:])
+            if retry {
+                guard case .retry = result else { return XCTFail("\(result)") }
+            } else {
+                XCTFail("应当失败，实际 \(result)")
+            }
+        } catch let error as ResolveError {
+            XCTAssertEqual(error, expected)
+        }
+    }
+
+    private func playerJSON(adaptive: String? = nil, formats: String) -> Data {
+        let adaptiveJSON = adaptive ?? formats
+        let progressive = adaptive == nil ? "[]" : formats
+        let text = """
+        {"playabilityStatus":{"status":"OK"},"videoDetails":{"videoId":"dQw4w9WgXcQ","title":"示例标题","author":"示例作者","lengthSeconds":"213","thumbnail":{"thumbnails":[{"url":"https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg","width":320},{"url":"https://i.ytimg.com/vi/dQw4w9WgXcQ/hq720.jpg","width":1280}]}},"streamingData":{"adaptiveFormats":\(adaptiveJSON),"formats":\(progressive)}}
+        """
+        return Data(text.utf8)
+    }
+}
+
+private final class OfflineHTTPClient: HTTPClient {
+    func send(_ request: URLRequest) async throws -> HTTPResponse {
+        throw URLError(.cannotConnectToHost)
     }
 }

@@ -1,6 +1,6 @@
 # 声匣
 
-给 Tom 自己用的 iPhone 音轨匣。粘贴哔哩哔哩或抖音的**公开视频**链接，在手机上解析、下载整条音轨，存进本机资料库播放。没有服务器，没有账号，也不会绕过大会员或任何付费墙，也不做人声分离。
+给 Tom 自己用的 iPhone 音轨匣。粘贴哔哩哔哩、抖音或 YouTube 的**公开视频**链接，在手机上解析、下载整条音轨，存进本机资料库播放。没有服务器，没有账号，也不会绕过大会员、会员专享或年龄限制，也不做人声分离。
 
 界面是简体中文。系统要求 iOS 16 及以上（在 iPhone 15 Pro 上使用）。
 
@@ -8,6 +8,7 @@
 
 - **哔哩哔哩**：完整链接、`b23.tv` 短链、单独的 BV 号，以及带 `?p=` 的分 P。先向公开接口要 `buvid`，再取稿件信息和 DASH 音频流（`fnval=16`），带上 Referer 和浏览器 User-Agent 下载。优先最高码率的 AAC；有 FLAC 就存 FLAC。杜比音轨会跳过。只剩 FLV 时会说明 iPhone 解不了。
 - **抖音**：分享文案、`v.douyin.com` 短链、视频页链接。先跟随跳转拿到视频号，再试分享页和公开的 `iteminfo`。这些接口现在经常不再返回播放地址，这时会在 App 里打开抖音网页（不登录），等页面自己请求到视频地址后再下载，并用系统的 AVFoundation 抽出音轨。
+- **YouTube**：`watch?v=`、`youtu.be`、`/shorts/`、`m.youtube.com`、`music.youtube.com`，以及夹在分享文案里的链接。手机直接请求 InnerTube `/youtubei/v1/player`（VISIONOS，失败再试 ANDROID_VR 1.65.10 和 iOS），只要返回没加密的音频地址就下载。优先 AAC itag 140，存成 M4A。不解签名，也不做 PO Token。私密、会员专享和年龄限制会直接说明，不会绕过。连不上时提示检查代理；只返回风控页时提示解析失败。WebM/Opus 在 iPhone 上播不了，所以不会拿它当结果。
 - 格式标清楚。iPhone 没有系统自带的 MP3 编码器，所以新保存的音轨是 **M4A（AAC）** 或源站给出的 **FLAC**。你放进文件夹的 MP3 会保持 MP3。
 - 资料库：封面、播放/暂停、上一首/下一首、拖动进度、随机、循环、删除。
 - 后台播放和锁屏控制（`AVAudioSession.playback`、`UIBackgroundModes: audio`、Now Playing、远程命令）。
@@ -64,6 +65,6 @@ swift test --package-path Packages/ShengXiaCore
 
 2026 年 11 月实测，抖音分享页的 `window._ROUTER_DATA` 里已经没有 `videoInfoRes` / `play_addr`。`iteminfo` 匿名请求经常是空 body，详情接口会要页面自己生成的校验。声匣不会去伪造这套签名。它只做两件事：能从公开数据里直接读到地址就下载；读不到就打开抖音自己的网页，把页面要到的视频地址接下来。抖音一改页面，就会看到「抖音解析失败，可能是抖音更新了校验」。图文作品没有视频音轨，会直接说明，不会去扒背景音乐。
 
-## 这次没能交出的东西
+## YouTube 为什么会失败
 
-这台构建环境是 Linux，没有 Xcode，也没有登录到 `giaotom` 的 GitHub，所以这里**没有**生成 IPA，也没办法替你在私人仓库里跑 macOS 工作流。把这个仓库推到你自己的私人 GitHub 仓库并打开 Actions 之后，构件里会出现 `ShengXia-unsigned.ipa`。
+2026 年 11 月，VISIONOS 客户端对一部分公开视频仍会返回可直接下载的 AAC（itag 140），整段文件可以下完。同一出口上，另一些视频会得到 `LOGIN_REQUIRED` / “Sign in to confirm you're not a bot”，声匣不会去伪造 PO Token，而是换 ANDROID_VR 和 iOS 再试一次，还不行就提示「YouTube 解析失败，可能是风控更新」。手机在国内打不开 YouTube 时，提示「YouTube 连接失败，请确认手机已开启代理」。

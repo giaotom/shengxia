@@ -118,6 +118,41 @@ public enum LinkParser {
         return digits && (15...20).contains(text.count)
     }
 
+    public static func isYouTubeHost(_ url: URL) -> Bool {
+        let host = (url.host ?? "").lowercased()
+        if host == "youtu.be" || host.hasSuffix(".youtu.be") { return true }
+        if host == "youtube.com" || host.hasSuffix(".youtube.com") { return true }
+        if host == "youtube-nocookie.com" || host.hasSuffix(".youtube-nocookie.com") { return true }
+        return false
+    }
+
+    public static func isYouTubeVideoID(_ text: String) -> Bool {
+        guard text.count == 11 else { return false }
+        let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
+        return text.unicodeScalars.allSatisfy { allowed.contains($0) }
+    }
+
+    public static func youtubeID(in url: URL) -> String? {
+        guard isYouTubeHost(url) else { return nil }
+        let host = (url.host ?? "").lowercased()
+        if host == "youtu.be" || host.hasSuffix(".youtu.be") {
+            let part = url.path.split(separator: "/").first.map(String.init) ?? ""
+            return isYouTubeVideoID(part) ? part : nil
+        }
+        if let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+           let value = items.first(where: { $0.name == "v" })?.value,
+           isYouTubeVideoID(value) {
+            return value
+        }
+        let parts = url.path.split(separator: "/").map(String.init)
+        let markers = ["shorts", "embed", "live", "v", "e"]
+        if let index = parts.firstIndex(where: { markers.contains($0.lowercased()) }), index + 1 < parts.count {
+            let candidate = parts[index + 1]
+            if isYouTubeVideoID(candidate) { return candidate }
+        }
+        return nil
+    }
+
     public static func pageNumber(from url: URL) -> Int? {
         guard let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
               let raw = items.first(where: { $0.name == "p" })?.value,

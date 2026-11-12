@@ -3,7 +3,7 @@ import Foundation
 public struct SourceRouter {
     public var sources: [any MediaSource]
 
-    public init(sources: [any MediaSource] = [BilibiliSource(), DouyinSource()]) {
+    public init(sources: [any MediaSource] = [BilibiliSource(), DouyinSource(), YouTubeSource()]) {
         self.sources = sources
     }
 
