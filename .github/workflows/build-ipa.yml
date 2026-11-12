@@ -9,7 +9,9 @@ on:
 
 jobs:
   ipa:
-    runs-on: macos-latest
+    # macos-latest is the arm64 pool, which has been failing to assign a runner.
+    # The Intel image is a separate pool and can still build an iphoneos IPA.
+    runs-on: macos-26-intel
     steps:
       - name: Checkout
         uses: actions/checkout@v4
