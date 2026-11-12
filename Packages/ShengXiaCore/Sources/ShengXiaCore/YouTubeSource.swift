@@ -15,7 +15,6 @@ public struct YouTubeSource: MediaSource {
               let videoID = LinkParser.youtubeID(in: url) else {
             throw ResolveError.youtubeNotAVideo
         }
-        var sawNetwork = false
         var sawRetry = false
         var sawNoAudio = false
         for preset in YouTubeClients.all {
@@ -36,7 +35,7 @@ public struct YouTubeSource: MediaSource {
             } catch let error as ResolveError {
                 switch error {
                 case .network:
-                    sawNetwork = true
+                    continue
                 case .badResponse:
                     sawRetry = true
                 default:
