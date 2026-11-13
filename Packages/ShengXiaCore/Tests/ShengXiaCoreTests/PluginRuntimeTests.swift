@@ -149,7 +149,7 @@ final class PluginRuntimeTests: XCTestCase {
         if ProcessInfo.processInfo.environment["CI"] == "true" {
             throw XCTSkip("CI 不启动插件引擎：JavaScriptCore 线程会把 swift test 卡死。")
         }
-        try PluginEngine(
+        return try PluginEngine(
             files: files,
             entry: "index.js",
             network: network,
