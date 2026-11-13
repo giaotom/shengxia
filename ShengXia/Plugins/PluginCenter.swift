@@ -534,7 +534,7 @@ private struct RemoteStream {
 }
 
 private enum PluginJSON {
-    static func text(_ object: [String: String]) -> String {
+    static func text(_ object: [String: Any]) -> String {
         (try? String(data: JSONSerialization.data(withJSONObject: object), encoding: .utf8)) ?? "{}"
     }
 

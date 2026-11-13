@@ -39,7 +39,7 @@ public final class PluginMemory: @unchecked Sendable {
         return storage[key]
     }
 
-    func setSetting(_ key: String, _ value: String) {
+    public func setSetting(_ key: String, _ value: String) {
         lock.lock()
         settings[key] = value
         lock.unlock()
