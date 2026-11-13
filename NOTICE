@@ -1,0 +1,27 @@
+# 第三方代码
+
+声匣自己的源码是 MIT。下面这些是另外带进来的代码，许可各不相同。
+
+音乐插件不在此列。它们在安装时从原作者的仓库下载，各自带着自己的许可，不随声匣的安装包分发。
+
+## 打进安装包的 JavaScript
+
+这些库只给 `require()` 用。目录里的 MyGo 插件不调用它们，它们走 `host.crypto` 和 `fetch`。
+
+| 模块 | 版本 | 许可 |
+| --- | --- | --- |
+| [crypto-js](https://github.com/brix/crypto-js) | 4.2.0 | MIT |
+| [dayjs](https://github.com/iamkun/dayjs) | 1.11.13 | MIT |
+| [he](https://github.com/mathiasbynens/he) | 1.2.0 | MIT |
+| [qs](https://github.com/ljharb/qs) | 6.13.1 | BSD-3-Clause |
+| [big-integer](https://github.com/peterolson/BigInteger.js) | 1.6.52 | Unlicense |
+
+`axios`、`cheerio` 和 `webdav` 没有打进对应的 npm 包。声匣写了很薄的一层：`axios` 走自己的 `fetch`，`cheerio` 只做标签、class、id 和属性，`webdav` 只做读取、上传和简单的目录列表。不能把它们当成完整的原库。
+
+## 解压
+
+安装 zip 时用的是 Mark Adler 的 [puff](https://github.com/madler/zlib/tree/master/contrib/puff)（zlib `contrib/puff`，版本 2.3）。许可是 puff.h 里的那段说明：可以用于任何目的，不能把原作者说成别人，改过的版本要标明。声匣没有改 puff 的算法。
+
+## 系统框架
+
+`host.crypto.md5` 和 `host.crypto.aesEcbEncrypt` 用的是 Apple CommonCrypto，不是上面的 crypto-js。播放、下载和网页登录用的是系统的 AVFoundation、URLSession 和 WebKit。

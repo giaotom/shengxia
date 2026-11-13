@@ -11,7 +11,12 @@ let package = Package(
         .library(name: "ShengXiaCore", targets: ["ShengXiaCore"])
     ],
     targets: [
-        .target(name: "ShengXiaCore"),
+        .target(name: "CInflate"),
+        .target(
+            name: "ShengXiaCore",
+            dependencies: ["CInflate"],
+            resources: [.process("Resources")]
+        ),
         .testTarget(name: "ShengXiaCoreTests", dependencies: ["ShengXiaCore"])
     ]
 )

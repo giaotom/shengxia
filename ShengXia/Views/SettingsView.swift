@@ -75,6 +75,12 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                Section("插件") {
+                    NavigationLink("音乐插件") { PluginsView() }
+                    Text("插件从原作者的仓库下载，不打包在声匣里。只播放插件返回的公开地址，不绕过会员和 DRM。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 Section("关于") {
                     LabeledContent("版本", value: versionText)
                     Text("声匣只保存公开视频的整条音轨，不绕过大会员、会员或年龄限制，也不做人声分离。")
@@ -115,7 +121,7 @@ struct SettingsView: View {
     }
 
     private var versionText: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.0.1"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.2.0"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
         return build.isEmpty ? version : "\(version)（\(build)）"
     }

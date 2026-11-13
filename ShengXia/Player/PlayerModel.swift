@@ -20,6 +20,7 @@ final class PlayerModel: ObservableObject {
     @Published var loopB: TimeInterval?
     @Published var sleepDeadline: Date?
     @Published var sleepAfterCurrent = false
+    @Published var lyricText: String?
 
     private let library: LibraryStore
     private let settings: SettingsStore
@@ -256,6 +257,48 @@ final class PlayerModel: ObservableObject {
         }
     }
 
+    func playStream(
+        url: URL,
+        headers: [String: String],
+        title: String,
+        artist: String,
+        sourceName: String,
+        format: String,
+        lyrics: String?
+    ) {
+        activateSession()
+        let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        let item = AVPlayerItem(asset: asset)
+        current = Track(
+            title: title,
+            artist: artist,
+            sourceName: sourceName,
+            sourceURL: url.absoluteString,
+            relativePath: "",
+            duration: 0,
+            formatLabel: format,
+            byteCount: 0
+        )
+        duration = 0
+        currentTime = 0
+        loopA = nil
+        loopB = nil
+        lyricText = lyrics
+        playbackError = nil
+        player.replaceCurrentItem(with: item)
+        player.volume = 1
+        player.playImmediately(atRate: rate)
+        isPlaying = true
+        publishNowPlaying(force: true)
+    }
+
+    private func lyricsBeside(_ track: Track) -> String? {
+        guard !track.relativePath.isEmpty else { return nil }
+        let sidecar = library.fileURL(for: track).deletingPathExtension().appendingPathExtension("lrc")
+        guard let text = try? String(contentsOf: sidecar, encoding: .utf8), !text.isEmpty else { return nil }
+        return text
+    }
+
     private func begin(_ track: Track, fadeIn: Bool) {
         activateSession()
         let url = library.fileURL(for: track)
@@ -269,6 +312,7 @@ final class PlayerModel: ObservableObject {
         currentTime = 0
         loopA = nil
         loopB = nil
+        lyricText = lyricsBeside(track)
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
         player.volume = fadeIn ? 0 : 1
         player.playImmediately(atRate: rate)
@@ -297,6 +341,7 @@ final class PlayerModel: ObservableObject {
         duration = 0
         loopA = nil
         loopB = nil
+        lyricText = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 

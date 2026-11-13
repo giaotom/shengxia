@@ -68,7 +68,7 @@ private struct MiniGlass: ViewModifier {
 }
 
 private enum PlayerPanel: String, Identifiable {
-    case queue, sleep, speed, edit, trim
+    case queue, sleep, speed, edit, trim, lyrics
     var id: String { rawValue }
 }
 
@@ -125,6 +125,8 @@ struct PlayerScreen: View {
                 if let track = player.current { MetadataEditor(track: track) }
             case .trim:
                 if let track = player.current { TrimEditor(track: track) }
+            case .lyrics:
+                LyricsSheet(text: player.lyricText ?? "")
             }
         }
     }
@@ -230,11 +232,17 @@ struct PlayerScreen: View {
             .accessibilityLabel("关闭")
             Spacer(minLength: 8)
             Menu {
+                if let lyrics = player.lyricText, !lyrics.isEmpty {
+                    Button { panel = .lyrics } label: { Label("歌词", systemImage: "quote.bubble") }
+                }
                 Button { panel = .edit } label: { Label("编辑信息", systemImage: "pencil") }
+                    .disabled(track.relativePath.isEmpty)
                 Button { panel = .trim } label: { Label("剪一段", systemImage: "scissors") }
+                    .disabled(track.relativePath.isEmpty)
                 Button { LinkOpener.open(track) } label: { Label("打开原视频", systemImage: "arrow.up.right.square") }
                     .disabled(track.sourceURL == nil)
                 Button(role: .destructive) { library.delete(track) } label: { Label("删除这首", systemImage: "trash") }
+                    .disabled(track.relativePath.isEmpty)
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.body.weight(.bold))
@@ -286,12 +294,19 @@ struct PlayerScreen: View {
     }
 
     private func sourceBadge(_ track: Track) -> some View {
-        Text("来自 \(track.sourceKind.shortName)")
+        Text("来自 \(sourceLabel(track))")
             .font(.caption.weight(.semibold))
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(badgeColor(track.sourceKind), in: Capsule())
             .foregroundStyle(.white)
+    }
+
+    private func sourceLabel(_ track: Track) -> String {
+        if track.sourceKind == .local, !track.sourceName.isEmpty, track.sourceName != "文件", track.sourceName != "本地" {
+            return track.sourceName
+        }
+        return track.sourceKind.shortName
     }
 
     private func badgeColor(_ kind: SourceKind) -> Color {
@@ -558,5 +573,26 @@ private struct SpeedSheet: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } } }
         }
         .presentationDetents([.medium])
+    }
+}
+
+private struct LyricsSheet: View {
+    var text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                Text(text)
+                    .font(.body)
+                    .foregroundStyle(SX.ink)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+            }
+            .background(SXBackground())
+            .navigationTitle("歌词")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } } }
+        }
     }
 }

@@ -7,6 +7,7 @@ struct RootView: View {
     @EnvironmentObject private var importer: ImportController
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var shell: ShellState
+    @EnvironmentObject private var plugins: PluginCenter
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -32,6 +33,7 @@ struct RootView: View {
                 .environmentObject(library)
                 .environmentObject(settings)
                 .environmentObject(shell)
+                .environmentObject(plugins)
         }
         .overlay {
             if let request = importer.webRequest {

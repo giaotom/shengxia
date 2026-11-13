@@ -7,6 +7,7 @@ struct ShengXiaApp: App {
     @StateObject private var player: PlayerModel
     @StateObject private var importer: ImportController
     @StateObject private var shell: ShellState
+    @StateObject private var plugins: PluginCenter
 
     init() {
         let settings = SettingsStore()
@@ -18,6 +19,7 @@ struct ShengXiaApp: App {
         _player = StateObject(wrappedValue: player)
         _importer = StateObject(wrappedValue: importer)
         _shell = StateObject(wrappedValue: ShellState())
+        _plugins = StateObject(wrappedValue: PluginCenter(library: library, player: player))
     }
 
     var body: some Scene {
@@ -28,6 +30,7 @@ struct ShengXiaApp: App {
                 .environmentObject(player)
                 .environmentObject(importer)
                 .environmentObject(shell)
+                .environmentObject(plugins)
         }
     }
 }

@@ -18,11 +18,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/giaotom/shengxia/releases/download/v2.0.1/ShengXia-2.0.1-unsigned.ipa"><img alt="下载 ShengXia 2.0.1 未签名 IPA" src="https://img.shields.io/badge/下载-ShengXia--2.0.1--unsigned.ipa-C23A2E?style=for-the-badge"></a>
+  <a href="https://github.com/giaotom/shengxia/releases/download/v2.2.0/ShengXia-2.2.0-unsigned.ipa"><img alt="下载 ShengXia 2.2.0 未签名 IPA" src="https://img.shields.io/badge/下载-ShengXia--2.2.0--unsigned.ipa-C23A2E?style=for-the-badge"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/giaotom/shengxia/releases/tag/v2.0.1">发布页 v2.0.1</a>
+  <a href="https://github.com/giaotom/shengxia/releases/tag/v2.2.0">发布页 v2.2.0</a>
   · 简体中文 · 只做 iPhone · 没有服务器，也没有账号
 </p>
 
@@ -44,7 +44,7 @@ iOS 26 用系统的 Liquid Glass：底部是悬浮的玻璃标签栏，迷你播
 
 有随机、列表循环、单曲循环、倍速（0.5×–2×）、A-B 循环、睡眠定时（按分钟，或这首播完再停）、下一首和播放队列。暂停和切歌会轻轻淡出。
 
-没有歌词页，也没有 AirPlay。锁屏和耳机线控还在。
+插件如果带回歌词，播放页右上角的更多菜单里可以看。没有 AirPlay。锁屏和耳机线控还在。
 
 ## 📚 资料库和歌单
 
@@ -90,14 +90,14 @@ iOS 26 用系统的 Liquid Glass：底部是悬浮的玻璃标签栏，迷你播
 
 ## 📲 用 Sideloadly 装到 iPhone
 
-已签名的包不会放上来。[v2.0.1 发布页](https://github.com/giaotom/shengxia/releases/tag/v2.0.1) 里的 `ShengXia-2.0.1-unsigned.ipa` 没有签名，Sideloadly 会用你自己的 Apple ID 重新签名。同一页还有图标和 `SHA256SUMS.txt`。
+已签名的包不会放上来。[v2.2.0 发布页](https://github.com/giaotom/shengxia/releases/tag/v2.2.0) 里的 `ShengXia-2.2.0-unsigned.ipa` 没有签名，Sideloadly 会用你自己的 Apple ID 重新签名。同一页还有图标和 `SHA256SUMS.txt`。
 
 免费 Apple ID 的描述文件大约 **7 天**过期，到期后再插上电脑签一次。免费账号同时能挂的自签 App 很少，个人用一台手机足够。
 
 1. 从 [sideloadly.io](https://sideloadly.io) 安装 Sideloadly。Windows 还需要微软商店里的「Apple 设备」，或 iTunes，电脑才认得到手机。
 2. 用数据线连接 iPhone，在手机上点「信任」。
 3. 打开 Sideloadly，登录你的 Apple ID。开了双重认证时，去 [appleid.apple.com](https://appleid.apple.com) 生成 App 专用密码，不要填账号的主密码。
-4. 把 `ShengXia-2.0.1-unsigned.ipa` 拖进去。Bundle ID 保持 `com.giaotom.shengxia` 即可。点 Start。
+4. 把 `ShengXia-2.2.0-unsigned.ipa` 拖进去。Bundle ID 保持 `com.giaotom.shengxia` 即可。点 Start。
 5. iOS 16 及以上打开开发者模式：设置 → 隐私与安全性 → 开发者模式，按提示重启。
 6. 设置 → 通用 → VPN 与设备管理，信任这个 Apple ID 的证书。
 7. 打开「声匣」。开始播放之后可以锁屏，不要把 App 从后台划掉，锁屏控制才会留着。
@@ -110,18 +110,17 @@ iOS 26 用系统的 Liquid Glass：底部是悬浮的玻璃标签栏，迷你播
 shengxia://extract?text=这里放视频链接
 ```
 
-## 🧩 插件，还在路上
+## 🧩 插件
 
-2.0 的提取、资料库和播放是做在 App 里面的，还没有插件接口。下面是打算拆出去的方向，方便以后加来源时不用改整棵界面。代码还没开始写。
+设置里的「音乐插件」可以安装 [MyGo Music](https://github.com/egoist/mygo-music) 这一路的 JavaScript 插件。插件**不在安装包里**。点目录里的「安装」，声匣才去原作者的 GitHub 仓库下载。也可以自己贴仓库地址、zip 或单个 `.js`。
 
-| 方向 | 想让它负责 |
-| --- | --- |
-| 来源插件 | 一个新的站点只实现「认链接、取公开音轨」 |
-| 处理插件 | 静音修剪、响度、转码，按开关串起来 |
-| 入口插件 | 剪贴板、分享扩展、快捷指令和 `shengxia://` 走同一条队列 |
-| 资料库插件 | 用公开信息补标题、作者和封面 |
+装好以后打开开关，在同一页搜索。每个已启用的插件是一个标签。点「播放」用插件返回的地址直接听，点「保存」把音频下到资料库，新保存的显示名仍然只留 10 个字。插件如果给了歌词，播放页的更多菜单里可以看。歌单编号可以导入到声匣自己的歌单，一次最多 12 首。
 
-不会做的事情也写在这里：不绕过会员和 DRM，不做人声分离，不加歌词页。
+目录里只放了这次核对时，搜索（或未登录时的首页）和播放都拿到了音频的来源。网易云、QQ 音乐各有两只插件，id 相同，会分开安装。酷狗概念版设置里的「每日 VIP」是插件自己去问酷狗，声匣没有再加一层会员逻辑。哔哩哔哩只播它直接给出的音频地址，需要 ffmpeg 的音质不会播。
+
+核对结果、没放进目录的仓库和原因写在 [docs/PLUGIN_COMPAT.md](docs/PLUGIN_COMPAT.md)。插件能调用的接口写在 [docs/PLUGINS.md](docs/PLUGINS.md)。
+
+这些插件是第三方作品，各有自己的许可。声匣不拥有它们返回的音频。只播放插件给出的公开地址，不绕过会员、付费墙、DRM 或年龄限制，也不做人声分离。登录用到的 cookie 放在钥匙串；签不上钥匙串的未签名包会退回到本机 Application Support。
 
 ## 🛠 技术栈
 
@@ -162,7 +161,7 @@ swift test --package-path Packages/ShengXiaCore
 
 声匣是个人学习项目，用来理解公开网页如何暴露音轨，以及如何在 iPhone 上做一个离线播放器。
 
-请只提取你有权保存的公开内容，并遵守哔哩哔哩、抖音、YouTube 和当地版权法。声匣**不会**绕过大会员、会员专享、付费墙、DRM 或年龄限制，也**不会**做人声分离。需要登录或付费才能听的内容，会直接告诉你原因。
+请只提取你有权保存的公开内容，并遵守哔哩哔哩、抖音、YouTube、插件所接网站和当地版权法。声匣**不会**绕过大会员、会员专享、付费墙、DRM 或年龄限制，也**不会**做人声分离。需要登录或付费才能听的内容，会直接告诉你原因。插件是第三方代码，从原作者仓库下载，不代表声匣拥有那些音源。
 
 MIT 许可只覆盖这份源代码。它不授予任何视频、音频或封面的权利。
 

@@ -1,0 +1,4 @@
+module CInflate {
+    header "puff.h"
+    export *
+}
