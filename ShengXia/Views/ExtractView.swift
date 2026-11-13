@@ -11,8 +11,8 @@ struct ExtractView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     header
                     pasteCard
-                    if let request = importer.webRequest {
-                        DouyinCapturePanel(request: request)
+                    if importer.webRequest != nil {
+                        DouyinCaptureStatus()
                     }
                     if !importer.jobs.isEmpty {
                         jobList
@@ -188,29 +188,29 @@ struct ExtractView: View {
     }
 }
 
-struct DouyinCapturePanel: View {
-    let request: WebCaptureRequest
+private struct DouyinCaptureStatus: View {
+    @EnvironmentObject private var importer: ImportController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("抖音页面")
                 .font(.headline)
                 .foregroundStyle(SX.ink)
-            Text("公开页面只用来拿到视频地址，不会登录你的抖音账号。如果出现验证，直接在页面里完成。")
+            Text(importer.verificationVisible
+                 ? "验证页已打开。滑块可以双指放大后再拖，通过后会自动继续。"
+                 : "公开页面只用来拿到视频地址，不会登录你的抖音账号。出现验证时会打开接近全屏的页面。")
                 .font(.caption)
                 .foregroundStyle(SX.ink.opacity(0.68))
-            GeometryReader { proxy in
-                let width: CGFloat = 1100
-                let height: CGFloat = 720
-                let scale = max(proxy.size.width / width, 0.2)
-                DouyinWebRepresentable(request: request)
-                    .frame(width: width, height: height)
-                    .scaleEffect(scale, anchor: .topLeading)
-                    .frame(width: proxy.size.width, height: height * scale, alignment: .topLeading)
+            if !importer.verificationVisible {
+                Button {
+                    importer.showVerification()
+                } label: {
+                    Label("打开验证页", systemImage: "viewfinder")
+                }
+                .sxGlassButton(prominent: true)
             }
-            .frame(height: 230)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .sxGlass(cornerRadius: 24)
     }

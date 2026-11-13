@@ -34,6 +34,16 @@ struct RootView: View {
                 .environmentObject(shell)
         }
         .overlay(alignment: .top) { clipboardBanner }
+        .overlay {
+            if let request = importer.webRequest {
+                DouyinWebRepresentable(request: request, verificationVisible: importer.verificationVisible)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
+                    .offset(y: 4000)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
         .alert(
             "有一点问题",
             isPresented: Binding(get: { library.lastError != nil }, set: { if !$0 { library.lastError = nil } })

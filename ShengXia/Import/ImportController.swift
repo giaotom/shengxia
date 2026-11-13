@@ -53,6 +53,7 @@ final class ImportController: ObservableObject {
     @Published var jobs: [ImportJob] = []
     @Published var webRequest: WebCaptureRequest?
     @Published var webHint = "正在打开抖音页面，等待视频地址…"
+    @Published var verificationVisible = false
     @Published var clipboardPrompt: String?
 
     private let library: LibraryStore
@@ -68,6 +69,9 @@ final class ImportController: ObservableObject {
     private var expectedID = ""
     private var debounce: Task<Void, Never>?
     private var timeoutTask: Task<Void, Never>?
+    private var verifyHideTask: Task<Void, Never>?
+    private var timeoutExtensions = 0
+    private var userHidVerification = false
     private var drainTask: Task<Void, Never>?
     private var currentJobID: UUID?
     private var forced: Set<UUID> = []
@@ -115,6 +119,18 @@ final class ImportController: ObservableObject {
         UserDefaults.standard.set(String(UIPasteboard.general.changeCount), forKey: "sx.clipboard.dismissed")
         clipboardPrompt = nil
         clipboardFull = ""
+    }
+
+    func showVerification() {
+        userHidVerification = false
+        verificationVisible = true
+        webHint = "请拖动滑块完成验证"
+        report(webHint, progress: nil)
+    }
+
+    func hideVerification() {
+        userHidVerification = true
+        verificationVisible = false
     }
 
     func enqueue(_ text: String) {
@@ -194,6 +210,25 @@ final class ImportController: ObservableObject {
                 finishCapture(.success(media))
             } else if (try? assembledImagePost()) == true {
                 finishCapture(.failure(ResolveError.douyinImagePost))
+            }
+        case "verify":
+            let active = (dict["active"] as? Bool) ?? ((dict["active"] as? NSNumber)?.boolValue ?? false)
+            if active {
+                verifyHideTask?.cancel()
+                guard !userHidVerification else { return }
+                verificationVisible = true
+                webHint = "请拖动滑块完成验证"
+                report(webHint, progress: nil)
+            } else {
+                verifyHideTask?.cancel()
+                verifyHideTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 700_000_000)
+                    guard !Task.isCancelled else { return }
+                    self.userHidVerification = false
+                    self.verificationVisible = false
+                    self.webHint = "验证已通过，继续提取…"
+                    self.report(self.webHint, progress: nil)
+                }
             }
         default:
             break
@@ -284,13 +319,26 @@ final class ImportController: ObservableObject {
         phase = .openingDouyin
         report(webHint, progress: nil)
         webRequest = request
+        timeoutExtensions = 0
+        userHidVerification = false
+        verificationVisible = false
         return try await withCheckedThrowingContinuation { continuation in
             captureContinuation = continuation
-            timeoutTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 28_000_000_000)
-                guard !Task.isCancelled else { return }
-                self.finishWithWhatWeHave()
+            armTimeout()
+        }
+    }
+
+    private func armTimeout() {
+        timeoutTask?.cancel()
+        timeoutTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 28_000_000_000)
+            guard !Task.isCancelled else { return }
+            if self.verificationVisible, self.timeoutExtensions < 6 {
+                self.timeoutExtensions += 1
+                self.armTimeout()
+                return
             }
+            self.finishWithWhatWeHave()
         }
     }
 
@@ -346,6 +394,9 @@ final class ImportController: ObservableObject {
         captureDone = true
         debounce?.cancel()
         timeoutTask?.cancel()
+        verifyHideTask?.cancel()
+        userHidVerification = false
+        verificationVisible = false
         webRequest = nil
         captureContinuation?.resume(with: result)
         captureContinuation = nil
