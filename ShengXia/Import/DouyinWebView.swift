@@ -60,7 +60,7 @@ final class DouyinWebContainer: UIView {
 }
 
 extension DouyinWebRepresentable {
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, UIAdaptivePresentationControllerDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, UISheetPresentationControllerDelegate {
         var importer: ImportController
         weak var container: DouyinWebContainer?
         private(set) var webView: WKWebView?
