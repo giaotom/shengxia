@@ -89,8 +89,12 @@ final class ImportController: ObservableObject {
 
     func considerClipboard() async {
         let board = UIPasteboard.general
-        let patterns = try? await board.detectPatterns(for: [.probableWebURL])
-        guard patterns?.contains(.probableWebURL) == true, let text = board.string else { return }
+        let patterns: Set<UIPasteboard.DetectionPattern> = await withCheckedContinuation { continuation in
+            board.detectPatterns(for: [.probableWebURL]) { (result: Result<Set<UIPasteboard.DetectionPattern>, Error>) in
+                continuation.resume(returning: (try? result.get()) ?? [])
+            }
+        }
+        guard patterns.contains(.probableWebURL), let text = board.string else { return }
         guard BatchInput.containsSupportedLink(text) else { return }
         let token = String(board.changeCount)
         if token == UserDefaults.standard.string(forKey: "sx.clipboard.dismissed") { return }
