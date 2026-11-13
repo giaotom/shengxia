@@ -254,19 +254,30 @@ public final class PluginEngine: @unchecked Sendable {
     }
 
     public func call(_ name: String, json: String? = nil, timeout: TimeInterval = 30) async throws -> String {
-        try await withCheckedThrowingContinuation { continuation in
-            thread.perform { [weak self] in
-                guard let self else {
-                    continuation.resume(throwing: PluginCallError.script("插件已经卸掉了"))
-                    return
-                }
-                do {
-                    let result = try self.callOnThread(name: name, json: json, timeout: timeout)
-                    continuation.resume(returning: result)
-                } catch {
-                    continuation.resume(throwing: error)
+        try await withThrowingTaskGroup(of: String.self) { group in
+            group.addTask { [self] in
+                try await withCheckedThrowingContinuation { continuation in
+                    self.thread.perform { [weak self] in
+                        guard let self else {
+                            continuation.resume(throwing: PluginCallError.script("插件已经卸掉了"))
+                            return
+                        }
+                        do {
+                            let result = try self.callOnThread(name: name, json: json, timeout: timeout)
+                            continuation.resume(returning: result)
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
+                    }
                 }
             }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64((timeout + 2) * 1_000_000_000))
+                throw PluginCallError.timeout
+            }
+            defer { group.cancelAll() }
+            guard let result = try await group.next() else { throw PluginCallError.timeout }
+            return result
         }
     }
 
@@ -353,7 +364,7 @@ public final class PluginEngine: @unchecked Sendable {
             thread.drain()
             context.evaluateScript("void 0")
             if context.objectForKeyedSubscript("__sxDone")?.toBool() == true { break }
-            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.02))
+            Thread.sleep(forTimeInterval: 0.01)
         }
         if let errorValue = context.objectForKeyedSubscript("__sxError"), errorValue.isString, let text = errorValue.toString() {
             throw Self.pluginError(from: text)
