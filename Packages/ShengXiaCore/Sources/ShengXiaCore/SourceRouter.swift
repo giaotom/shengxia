@@ -7,6 +7,10 @@ public struct SourceRouter {
         self.sources = sources
     }
 
+    public init(quality: AudioQuality) {
+        self.init(sources: [BilibiliSource(quality: quality), DouyinSource(), YouTubeSource()])
+    }
+
     public func resolve(_ input: String, client: any HTTPClient) async throws -> ResolveStep {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.isEmpty { throw ResolveError.emptyInput }

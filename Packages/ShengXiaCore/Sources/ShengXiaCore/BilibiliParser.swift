@@ -82,7 +82,7 @@ enum BilibiliParser {
         return "\(video.title) · \(part)"
     }
 
-    static func parsePlay(_ data: Data) throws -> BilibiliAudioPick {
+    static func parsePlay(_ data: Data, quality: AudioQuality = .best) throws -> BilibiliAudioPick {
         let root = try JSON.object(from: data)
         let code = JSON.int(root, "code") ?? -1
         let message = JSON.string(root, "message") ?? ""
@@ -92,7 +92,7 @@ enum BilibiliParser {
         }
         if let dash = JSON.dictionary(payload, "dash") {
             let candidates = audioCandidates(in: dash)
-            if let best = candidates.max(by: { $0.bandwidth < $1.bandwidth }) {
+            if let best = pick(candidates, quality: quality) {
                 return BilibiliAudioPick(
                     urls: best.urls,
                     kind: .audio,
@@ -143,6 +143,18 @@ enum BilibiliParser {
         var bandwidth: Int
         var fileExtension: String
         var formatLabel: String
+    }
+
+    private static func pick(_ candidates: [Candidate], quality: AudioQuality) -> Candidate? {
+        let aac = candidates.filter { $0.fileExtension != "flac" }
+        switch quality {
+        case .best:
+            return candidates.max(by: { $0.bandwidth < $1.bandwidth })
+        case .standard:
+            return aac.max(by: { $0.bandwidth < $1.bandwidth }) ?? candidates.max(by: { $0.bandwidth < $1.bandwidth })
+        case .compact:
+            return aac.min(by: { $0.bandwidth < $1.bandwidth }) ?? candidates.min(by: { $0.bandwidth < $1.bandwidth })
+        }
     }
 
     private static func audioCandidates(in dash: [String: Any]) -> [Candidate] {

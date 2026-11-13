@@ -4,7 +4,11 @@ public struct BilibiliSource: MediaSource {
     public let id = "bilibili"
     public let displayName = "哔哩哔哩"
 
-    public init() {}
+    public var quality: AudioQuality
+
+    public init(quality: AudioQuality = .best) {
+        self.quality = quality
+    }
 
     public func canHandle(_ input: String) -> Bool {
         if LinkParser.extractURLs(from: input).contains(where: LinkParser.isBilibiliHost) { return true }
@@ -35,12 +39,13 @@ public struct BilibiliSource: MediaSource {
             fileExtension: pick.fileExtension,
             formatLabel: pick.formatLabel
         )
-        let pageURL: String
+        var pageURL: String
         if !video.bvid.isEmpty {
             pageURL = "https://www.bilibili.com/video/\(video.bvid)"
         } else {
             pageURL = "https://www.bilibili.com/video/av\(video.aid)"
         }
+        if page.page > 1 { pageURL += "?p=\(page.page)" }
         return .ready(ResolvedMedia(
             title: BilibiliParser.displayTitle(video, page: page),
             author: video.owner,
@@ -145,7 +150,7 @@ public struct BilibiliSource: MediaSource {
         guard response.statusCode == 200 else {
             throw ResolveError.bilibiliMessage("读取音频失败（HTTP \(response.statusCode)）")
         }
-        return try BilibiliParser.parsePlay(response.data)
+        return try BilibiliParser.parsePlay(response.data, quality: quality)
     }
 
     private func refererURL(video: BilibiliVideo) -> String {
