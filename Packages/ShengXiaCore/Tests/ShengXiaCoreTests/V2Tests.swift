@@ -232,12 +232,12 @@ final class AudioMathTests: XCTestCase {
     }
 
     func testDisplayTitleKeepsTenGraphemes() {
-        XCTAssertEqual(DisplayTitle.shortened("从小被教要吃饱却很少被"), "从小被教要吃饱却很")
+        XCTAssertEqual(DisplayTitle.shortened("从小被教要吃饱却很少被"), "从小被教要吃饱却很少")
         XCTAssertEqual(DisplayTitle.shortened("大连这座城市"), "大连这座城市")
         XCTAssertEqual(DisplayTitle.shortened("这个世界会好吗"), "这个世界会好吗")
         XCTAssertEqual(DisplayTitle.shortened(String(repeating: "🌆", count: 11)), String(repeating: "🌆", count: 10))
         XCTAssertEqual(DisplayTitle.shortened(String(repeating: "e\u{0301}", count: 12)).count, 10)
         XCTAssertEqual(DisplayTitle.shortened("  \n"), "未命名音轨")
-        XCTAssertEqual(DisplayTitle.shortened("小猫想吃🍕，2021年"), "小猫想吃🍕，202")
+        XCTAssertEqual(DisplayTitle.shortened("小猫想吃🍕，2021年"), "小猫想吃🍕，2021")
     }
 }
