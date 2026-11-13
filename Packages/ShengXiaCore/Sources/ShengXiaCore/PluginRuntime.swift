@@ -249,7 +249,7 @@ public final class PluginEngine: @unchecked Sendable {
             names = value?.toArray() as? [String] ?? []
             ready.signal()
         }
-        ready.wait()
+        if ready.wait(timeout: .now() + 8) == .timedOut { return [] }
         return names.sorted()
     }
 
@@ -282,7 +282,9 @@ public final class PluginEngine: @unchecked Sendable {
             }
             ready.signal()
         }
-        ready.wait()
+        if ready.wait(timeout: .now() + 8) == .timedOut {
+            throw PluginCallError.timeout
+        }
         if let setupError { throw setupError }
     }
 
@@ -348,6 +350,7 @@ public final class PluginEngine: @unchecked Sendable {
                 context.evaluateScript("__sxGen++;")
                 throw PluginCallError.timeout
             }
+            thread.drain()
             context.evaluateScript("void 0")
             if context.objectForKeyedSubscript("__sxDone")?.toBool() == true { break }
             RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.02))
@@ -545,7 +548,9 @@ private final class PluginBridge {
 
 private final class PluginLoop: Thread {
     private let started = DispatchSemaphore(value: 0)
-    fileprivate var loop: CFRunLoop?
+    private let lock = NSLock()
+    private var queue: [() -> Void] = []
+    private var loop: CFRunLoop?
 
     override init() {
         super.init()
@@ -558,19 +563,29 @@ private final class PluginLoop: Thread {
         loop = CFRunLoopGetCurrent()
         started.signal()
         while !isCancelled {
-            _ = CFRunLoopRunInMode(.defaultMode, 0.5, false)
+            drain()
+            _ = CFRunLoopRunInMode(.defaultMode, 0.05, false)
         }
     }
 
     func perform(_ block: @escaping () -> Void) {
-        if loop != nil, CFRunLoopGetCurrent() == loop {
+        if Thread.current == self {
             block()
             return
         }
-        started.wait()
-        guard let loop else { return }
-        CFRunLoopPerformBlock(loop, CFRunLoopMode.defaultMode.rawValue, block)
+        guard started.wait(timeout: .now() + 5) == .success, let loop else { return }
+        lock.lock()
+        queue.append(block)
+        lock.unlock()
         CFRunLoopWakeUp(loop)
+    }
+
+    func drain() {
+        lock.lock()
+        let blocks = queue
+        queue.removeAll()
+        lock.unlock()
+        blocks.forEach { $0() }
     }
 
     deinit {

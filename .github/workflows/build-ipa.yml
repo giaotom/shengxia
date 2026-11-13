@@ -17,6 +17,7 @@ jobs:
     # macos-latest is the arm64 pool, which has been failing to assign a runner.
     # The Intel image is a separate pool and can still build an iphoneos IPA.
     runs-on: macos-26-intel
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
