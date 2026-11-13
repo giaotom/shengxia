@@ -1,16 +1,17 @@
+import ShengXiaCore
 import SwiftUI
 import UIKit
 
-struct MiniPlayer: View {
-    @EnvironmentObject private var library: LibraryStore
+struct MiniPlayerBar: View {
+    var showsGlass: Bool
     @EnvironmentObject private var player: PlayerModel
-    let onOpen: () -> Void
+    @EnvironmentObject private var shell: ShellState
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onOpen) {
-                HStack(spacing: 12) {
-                    cover
+        HStack(spacing: 10) {
+            Button { shell.showPlayer = true } label: {
+                HStack(spacing: 10) {
+                    CoverThumb(track: player.current, side: 40, radius: 8)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(player.current?.title ?? "未在播放")
                             .font(.subheadline.weight(.semibold))
@@ -26,192 +27,440 @@ struct MiniPlayer: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("打开正在播放")
-
-            Button(action: { player.toggle() }) {
+            Button { player.toggle() } label: {
                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                     .font(.title3)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 42, height: 42)
             }
-            .accessibilityLabel(player.isPlaying ? "暂停" : "播放")
+            .buttonStyle(.plain)
             .foregroundStyle(SX.cinnabar)
+            .accessibilityLabel(player.isPlaying ? "暂停" : "播放")
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 6)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(SX.mist.opacity(0.7), lineWidth: 1)
-        )
+        .padding(.leading, 8)
+        .padding(.trailing, 4)
+        .padding(.vertical, 6)
+        .background(alignment: .bottom) { progressLine }
+        .modifier(MiniGlass(on: showsGlass))
     }
 
-    @ViewBuilder
-    private var cover: some View {
-        Group {
-            if let track = player.current, let url = library.coverURL(for: track), let image = UIImage(contentsOfFile: url.path) {
-                Image(uiImage: image).resizable().scaledToFill()
-            } else {
-                ZStack {
-                    SX.cinnabar.opacity(0.18)
-                    Image(systemName: "music.note").foregroundStyle(SX.cinnabar)
-                }
-            }
-        }
-        .frame(width: 44, height: 44)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    private var progress: CGFloat {
+        guard player.duration > 0 else { return 0 }
+        return CGFloat(min(max(player.currentTime / player.duration, 0), 1))
     }
+
+    private var progressLine: some View {
+        GeometryReader { geo in
+            Capsule()
+                .fill(SX.cinnabar)
+                .frame(width: max(4, geo.size.width * progress), height: 2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        }
+        .frame(height: 2)
+    }
+}
+
+private struct MiniGlass: ViewModifier {
+    var on: Bool
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if on { content.sxGlass(cornerRadius: 18) } else { content }
+    }
+}
+
+private enum PlayerPanel: String, Identifiable {
+    case queue, sleep, speed, edit, trim
+    var id: String { rawValue }
 }
 
 struct PlayerScreen: View {
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var player: PlayerModel
     @Environment(\.dismiss) private var dismiss
-    let onDelete: (Track) -> Void
+    @State private var panel: PlayerPanel?
+    @State private var artwork: UIImage?
 
     var body: some View {
         ZStack {
-            SX.paper.ignoresSafeArea()
+            backdrop
             if let track = player.current {
-                ScrollView {
-                    VStack(spacing: 22) {
-                        cover(track)
-                            .padding(.top, 28)
-                        VStack(spacing: 6) {
-                            Text(track.title)
-                                .font(.title2.weight(.semibold))
-                                .foregroundStyle(SX.ink)
-                                .multilineTextAlignment(.center)
-                            Text(track.artist)
-                                .font(.body)
-                                .foregroundStyle(SX.ink.opacity(0.68))
-                            Text("\(track.formatLabel) · \(track.sourceName) · 整轨，未做人声分离")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(SX.brass)
-                                .multilineTextAlignment(.center)
-                            if track.byteCount > 0 {
-                                Text(ByteText.string(track.byteCount))
-                                    .font(.caption2)
-                                    .foregroundStyle(SX.ink.opacity(0.45))
-                            }
-                        }
-                        .padding(.horizontal, 24)
-
-                        VStack(spacing: 8) {
-                            Slider(
-                                value: Binding(
-                                    get: { player.currentTime },
-                                    set: { player.currentTime = $0 }
-                                ),
-                                in: 0...max(player.duration, 0.1),
-                                onEditingChanged: { editing in
-                                    player.isScrubbing = editing
-                                    if !editing { player.seek(to: player.currentTime) }
-                                }
-                            )
-                            .tint(SX.cinnabar)
-                            .accessibilityLabel("播放进度")
-                            HStack {
-                                Text(Clock.string(player.currentTime))
-                                Spacer()
-                                Text(Clock.string(player.duration))
-                            }
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(SX.ink.opacity(0.55))
-                        }
-                        .padding(.horizontal, 28)
-
-                        HStack(spacing: 22) {
-                            modeButton(
-                                symbol: "shuffle",
-                                label: player.shuffle ? "关闭随机" : "随机播放",
-                                active: player.shuffle
-                            ) { player.toggleShuffle() }
-                            transportButton("backward.fill", label: "上一首") { player.playPrevious() }
-                            Button(action: { player.toggle() }) {
-                                Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundStyle(SX.paper)
-                                    .frame(width: 72, height: 72)
-                                    .background(SX.cinnabar, in: Circle())
-                            }
-                            .accessibilityLabel(player.isPlaying ? "暂停" : "播放")
-                            transportButton("forward.fill", label: "下一首") { player.playNext(automatic: false) }
-                            modeButton(
-                                symbol: player.repeatMode.symbol,
-                                label: player.repeatMode.title,
-                                active: player.repeatMode != .off
-                            ) { player.cycleRepeat() }
-                        }
-
-                        if let playbackError = player.playbackError {
-                            Text(playbackError)
-                                .font(.footnote)
-                                .foregroundStyle(SX.cinnabar)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 24)
-                        }
-
-                        Button(role: .destructive) {
-                            onDelete(track)
-                        } label: {
-                            Label("删除这首", systemImage: "trash")
-                        }
-                        .padding(.top, 8)
-                        .padding(.bottom, 28)
+                VStack(spacing: 18) {
+                    topBar(track)
+                    Spacer(minLength: 0)
+                    cover(track)
+                    titles(track)
+                    sourceBadge(track)
+                    scrubber
+                    modeRow
+                    transport
+                    actions(track)
+                    if let playbackError = player.playbackError {
+                        Text(playbackError)
+                            .font(.footnote)
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
                     }
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, 22)
+                .padding(.bottom, 18)
+                .foregroundStyle(.white)
             } else {
-                VStack(spacing: 12) {
-                    Text("还没有在播的音轨")
-                        .font(.headline)
-                        .foregroundStyle(SX.ink)
-                    Button("关闭") { dismiss() }
+                VStack(spacing: 14) {
+                    Text("还没有在播的音轨").font(.headline)
+                    Button("关闭") { dismiss() }.sxGlassButton()
                 }
+                .foregroundStyle(.white)
             }
         }
+        .task(id: player.current?.coverRelativePath) { loadArtwork() }
+        .sheet(item: $panel) { item in
+            switch item {
+            case .queue: QueueSheet()
+            case .sleep: SleepSheet()
+            case .speed: SpeedSheet()
+            case .edit:
+                if let track = player.current { MetadataEditor(track: track) }
+            case .trim:
+                if let track = player.current { TrimEditor(track: track) }
+            }
+        }
+    }
+
+    private var backdrop: some View {
+        ZStack {
+            if let artwork {
+                Image(uiImage: artwork)
+                    .resizable()
+                    .scaledToFill()
+                    .blur(radius: 48)
+                    .scaleEffect(1.15)
+            } else {
+                LinearGradient(colors: [SX.cinnabar, Color(red: 0.25, green: 0.08, blue: 0.06)], startPoint: .top, endPoint: .bottom)
+            }
+            LinearGradient(colors: [Color.black.opacity(0.25), Color.black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
+        }
+        .ignoresSafeArea()
+    }
+
+    private func topBar(_ track: Track) -> some View {
+        HStack {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.down")
+                    .font(.body.weight(.bold))
+                    .frame(width: 40, height: 40)
+            }
+            .buttonStyle(.plain)
+            .modifier(CircleGlass())
+            .accessibilityLabel("关闭")
+            Spacer()
+            Menu {
+                Button { panel = .edit } label: { Label("编辑信息", systemImage: "pencil") }
+                Button { panel = .trim } label: { Label("剪一段", systemImage: "scissors") }
+                Button { LinkOpener.open(track) } label: { Label("打开原视频", systemImage: "arrow.up.right.square") }
+                    .disabled(track.sourceURL == nil)
+                Button(role: .destructive) { library.delete(track) } label: { Label("删除这首", systemImage: "trash") }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.body.weight(.bold))
+                    .frame(width: 40, height: 40)
+            }
+            .buttonStyle(.plain)
+            .modifier(CircleGlass())
+            .accessibilityLabel("更多")
+        }
+        .padding(.top, 8)
     }
 
     private func cover(_ track: Track) -> some View {
-        Group {
-            if let url = library.coverURL(for: track), let image = UIImage(contentsOfFile: url.path) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
+        CoverThumb(track: track, side: 280, radius: 36)
+            .shadow(color: .black.opacity(0.35), radius: 24, y: 16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 36, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
+            )
+    }
+
+    private func titles(_ track: Track) -> some View {
+        VStack(spacing: 6) {
+            Text(track.title)
+                .font(.title2.weight(.bold))
+                .multilineTextAlignment(.center)
+                .shadow(color: .black.opacity(0.35), radius: 8, y: 2)
+            Text(track.artist)
+                .font(.body)
+                .foregroundStyle(.white.opacity(0.84))
+            if track.byteCount > 0 || track.processingNote != nil {
+                Text(detailLine(track))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.62))
+                    .multilineTextAlignment(.center)
+            }
+        }
+    }
+
+    private func sourceBadge(_ track: Track) -> some View {
+        Text("来自 \(track.sourceKind.shortName)")
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(badgeColor(track.sourceKind), in: Capsule())
+            .foregroundStyle(.white)
+    }
+
+    private func badgeColor(_ kind: SourceKind) -> Color {
+        switch kind {
+        case .bilibili: return Color(red: 0.09, green: 0.47, blue: 0.85)
+        case .douyin: return Color(red: 0.12, green: 0.12, blue: 0.14)
+        case .youtube: return Color(red: 0.78, green: 0.12, blue: 0.12)
+        case .local: return SX.brass
+        }
+    }
+
+    private var scrubber: some View {
+        VStack(spacing: 6) {
+            Slider(
+                value: Binding(get: { player.currentTime }, set: { player.currentTime = $0 }),
+                in: 0...max(player.duration, 0.1),
+                onEditingChanged: { editing in
+                    player.isScrubbing = editing
+                    if !editing { player.seek(to: player.currentTime) }
+                }
+            )
+            .tint(.white)
+            .accessibilityLabel("播放进度")
+            HStack {
+                Text(Clock.string(player.currentTime))
+                Spacer()
+                Text(Clock.string(player.duration))
+            }
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.white.opacity(0.75))
+        }
+    }
+
+    private var modeRow: some View {
+        HStack {
+            modeButton("shuffle", "随机播放", player.shuffle) { player.toggleShuffle() }
+            Spacer()
+            modeButton(player.repeatMode.symbol, player.repeatMode.title, player.repeatMode != .off) { player.cycleRepeat() }
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private var transport: some View {
+        HStack(spacing: 26) {
+            plainTransport("backward.fill", "上一首") { player.playPrevious() }
+            Button { player.toggle() } label: {
+                Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 26, weight: .bold))
+                    .frame(width: 64, height: 64)
+            }
+            .buttonStyle(.plain)
+            .modifier(CircleGlass(active: true))
+            .accessibilityLabel(player.isPlaying ? "暂停" : "播放")
+            plainTransport("forward.fill", "下一首") { player.playNext(automatic: false) }
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 8)
+        .sxCapsuleGlass()
+    }
+
+    private func actions(_ track: Track) -> some View {
+        let row = HStack(spacing: 8) {
+            round("list.bullet", "队列", false) { panel = .queue }
+            round(player.abActive ? "b.circle.fill" : "a.circle", player.abTitle, player.abActive) { player.toggleAB() }
+            round("speedometer", player.rate == 1 ? "倍速" : "\(formatRate(player.rate))×", player.rate != 1) { panel = .speed }
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                round("moon.zzz", player.sleepCaption(at: context.date) ?? "定时", player.sleepCaption(at: context.date) != nil) { panel = .sleep }
+            }
+            round(track.isFavorite ? "heart.fill" : "heart", "喜欢", track.isFavorite) { library.toggleFavorite(track.id) }
+        }
+        return Group {
+            if #available(iOS 26, *) {
+                GlassEffectContainer(spacing: 10) { row }
             } else {
-                ZStack {
-                    SX.cinnabar.opacity(0.18)
-                    Image(systemName: "music.note")
-                        .font(.system(size: 64))
-                        .foregroundStyle(SX.cinnabar)
+                row
+            }
+        }
+    }
+
+    private func round(_ symbol: String, _ title: String, _ active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: symbol)
+                    .font(.body.weight(.semibold))
+                    .frame(width: 54, height: 54)
+                    .modifier(CircleGlass(active: active))
+                Text(title)
+                    .font(.caption2)
+                    .lineLimit(1)
+                    .frame(maxWidth: 64)
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(active ? SX.cinnabar : Color.white)
+        .accessibilityLabel(title)
+    }
+
+    private func plainTransport(_ symbol: String, _ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.title2).frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private func modeButton(_ symbol: String, _ label: String, _ active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.body.weight(.semibold)).frame(width: 44, height: 36)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(active ? SX.cinnabar : Color.white.opacity(0.7))
+        .accessibilityLabel(label)
+    }
+
+    private func detailLine(_ track: Track) -> String {
+        var pieces = [track.formatLabel]
+        if track.byteCount > 0 { pieces.append(ByteText.string(track.byteCount)) }
+        if let note = track.processingNote, !note.isEmpty { pieces.append(note) }
+        return pieces.joined(separator: " · ")
+    }
+
+    private func formatRate(_ rate: Float) -> String {
+        let hundred = (rate * 100).rounded() / 100
+        if abs(hundred - hundred.rounded()) < 0.001 { return String(format: "%.0f", hundred) }
+        return String(format: "%.2f", hundred)
+    }
+
+    private func loadArtwork() {
+        guard let track = player.current, let url = library.coverURL(for: track) else {
+            artwork = nil
+            return
+        }
+        artwork = UIImage(contentsOfFile: url.path)
+    }
+}
+
+private struct QueueSheet: View {
+    @EnvironmentObject private var player: PlayerModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let current = player.current {
+                    Section("正在播放") {
+                        Text(current.title).font(.body.weight(.semibold))
+                        Text(current.artist).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                Section("接下来") {
+                    if player.upcomingTracks.isEmpty {
+                        Text("队列后面是空的").foregroundStyle(.secondary)
+                    } else {
+                        ForEach(player.upcomingTracks) { track in
+                            Button { player.jumpUpcoming(track) } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(track.title).foregroundStyle(SX.ink).lineLimit(1)
+                                    Text(track.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                            }
+                        }
+                        .onMove { player.moveUpcoming(from: $0, to: $1) }
+                        .onDelete { player.removeUpcoming(at: $0) }
+                    }
+                }
+            }
+            .navigationTitle("队列")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
+                ToolbarItem(placement: .topBarLeading) { EditButton() }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button(player.shuffle ? "关闭随机" : "随机播放") { player.toggleShuffle() }
+                        Button(player.repeatMode.title) { player.cycleRepeat() }
+                        Button("清空后面") { player.clearUpcoming() }
+                    } label: { Image(systemName: "ellipsis.circle") }
                 }
             }
         }
-        .frame(width: 280, height: 280)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .stroke(SX.brass.opacity(0.45), lineWidth: 1)
-        )
-        .shadow(color: SX.ink.opacity(0.12), radius: 18, y: 10)
+        .presentationDetents([.medium, .large])
     }
+}
 
-    private func transportButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.title2)
-                .frame(width: 44, height: 44)
+private struct SleepSheet: View {
+    @EnvironmentObject private var player: PlayerModel
+    @Environment(\.dismiss) private var dismiss
+    private let choices = [15, 30, 45, 60, 90]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if let caption = player.sleepCaption() {
+                    Section {
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            Text("定时还剩 \(player.sleepCaption(at: context.date) ?? caption)")
+                        }
+                    }
+                }
+                Section {
+                    ForEach(choices, id: \.self) { minutes in
+                        Button("\(minutes) 分钟") {
+                            player.startSleep(minutes: minutes)
+                            dismiss()
+                        }
+                    }
+                    Button("播完这首") {
+                        player.sleepAtEndOfTrack()
+                        dismiss()
+                    }
+                }
+                if player.sleepCaption() != nil {
+                    Section {
+                        Button("关闭定时", role: .destructive) {
+                            player.cancelSleep()
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("定时关闭")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } } }
         }
-        .accessibilityLabel(label)
-        .foregroundStyle(SX.ink)
+        .presentationDetents([.medium])
     }
+}
 
-    private func modeButton(symbol: String, label: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.body.weight(.semibold))
-                .frame(width: 44, height: 44)
+private struct SpeedSheet: View {
+    @EnvironmentObject private var player: PlayerModel
+    @Environment(\.dismiss) private var dismiss
+    private let presets: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(String(format: "%.2f×", player.rate))
+                    .font(.system(size: 44, weight: .semibold, design: .rounded))
+                    .frame(maxWidth: .infinity)
+                Slider(value: Binding(get: { Double(player.rate) }, set: { player.setRate(Float($0)) }), in: 0.5...2)
+                    .tint(SX.cinnabar)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 4), spacing: 10) {
+                    ForEach(presets, id: \.self) { preset in
+                        Button(preset == floor(preset) ? String(format: "%.0f×", preset) : String(format: "%.2f×", preset)) {
+                            player.setRate(preset)
+                        }
+                        .sxGlassButton(prominent: abs(player.rate - preset) < 0.01)
+                    }
+                }
+                Spacer()
+            }
+            .padding(20)
+            .navigationTitle("倍速")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("完成") { dismiss() } } }
         }
-        .accessibilityLabel(label)
-        .foregroundStyle(active ? SX.cinnabar : SX.ink.opacity(0.45))
+        .presentationDetents([.medium])
     }
 }

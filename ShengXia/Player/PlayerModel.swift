@@ -1,29 +1,11 @@
 import AVFoundation
 import MediaPlayer
+import ShengXiaCore
 import SwiftUI
 import UIKit
 
 @MainActor
 final class PlayerModel: ObservableObject {
-    enum RepeatMode: String {
-        case off, all, one
-
-        var title: String {
-            switch self {
-            case .off: return "不循环"
-            case .all: return "列表循环"
-            case .one: return "单曲循环"
-            }
-        }
-
-        var symbol: String {
-            switch self {
-            case .off, .all: return "repeat"
-            case .one: return "repeat.1"
-            }
-        }
-    }
-
     @Published var current: Track?
     @Published var isPlaying = false
     @Published var currentTime: TimeInterval = 0
@@ -32,17 +14,42 @@ final class PlayerModel: ObservableObject {
     @Published var repeatMode: RepeatMode = .off
     @Published var isScrubbing = false
     @Published var playbackError: String?
+    @Published var rate: Float
+    @Published private(set) var queue = PlayQueue()
+    @Published var loopA: TimeInterval?
+    @Published var loopB: TimeInterval?
+    @Published var sleepDeadline: Date?
+    @Published var sleepAfterCurrent = false
 
     private let library: LibraryStore
+    private let settings: SettingsStore
     private let player = AVPlayer()
-    private var queue: [Track] = []
-    private var shuffledQueue: [Track] = []
     private var timeObserver: Any?
     private var sessionReady = false
     private var lastNowPlayingUpdate = Date.distantPast
+    private var transition: Task<Void, Never>?
+    private var sleepTask: Task<Void, Never>?
 
-    init(library: LibraryStore) {
+    init(library: LibraryStore, settings: SettingsStore) {
         self.library = library
+        self.settings = settings
+        rate = settings.playbackRate
+    }
+
+    var upcomingTracks: [Track] { queue.upcoming.compactMap { library.track(id: $0) } }
+
+    var abActive: Bool { loopA != nil }
+
+    var abTitle: String {
+        if loopA == nil { return "A-B" }
+        if loopB == nil { return "设 B" }
+        return "A-B"
+    }
+
+    func sleepCaption(at date: Date = Date()) -> String? {
+        if sleepAfterCurrent { return "播完" }
+        guard let sleepDeadline else { return nil }
+        return Clock.string(max(0, sleepDeadline.timeIntervalSince(date)))
     }
 
     func activateSession() {
@@ -55,22 +62,201 @@ final class PlayerModel: ObservableObject {
         installRemoteCommands()
     }
 
-    func syncQueue(_ tracks: [Track]) {
-        let sameOrder = queue.map(\.id) == tracks.map(\.id)
-        queue = tracks
-        if let current, !tracks.contains(where: { $0.id == current.id }) {
-            stop()
-            return
-        }
-        if shuffle && !sameOrder {
-            reshuffle(keepingCurrentFirst: true)
-        }
+    func noteLibrary(_ tracks: [Track]) {
+        let removed = updateQueue { $0.retain(Set(tracks.map(\.id))) }
         if let current, let updated = tracks.first(where: { $0.id == current.id }) {
             self.current = updated
         }
+        guard removed else { return }
+        if let id = queue.current, let track = tracks.first(where: { $0.id == id }) {
+            begin(track, fadeIn: false)
+        } else {
+            halt()
+        }
     }
 
-    func play(_ track: Track) {
+    func play(_ track: Track, in context: [Track]) {
+        activateSession()
+        var ids = context.map(\.id)
+        if !ids.contains(track.id) { ids.insert(track.id, at: 0) }
+        if queue.context != ids || !queue.items.contains(track.id) {
+            updateQueue { $0.load(ids, startAt: track.id, shuffle: shuffle) }
+        } else {
+            updateQueue { $0.jump(toID: track.id) }
+        }
+        transitionTo(track)
+    }
+
+    func toggle() {
+        if current == nil {
+            if let id = queue.current ?? queue.items.first, let track = library.track(id: id) {
+                play(track, in: library.tracks)
+            } else if let first = library.tracks.first {
+                play(first, in: library.tracks)
+            }
+            return
+        }
+        if isPlaying {
+            transition?.cancel()
+            transition = Task { await fadeOutAndPause() }
+        } else {
+            player.volume = 0
+            player.playImmediately(atRate: rate)
+            isPlaying = true
+            publishNowPlaying(force: true)
+            transition?.cancel()
+            transition = Task { await ramp(to: 1, duration: 0.16) }
+        }
+    }
+
+    func playNext(automatic: Bool) {
+        if automatic && sleepAfterCurrent {
+            sleepAfterCurrent = false
+            Task { await fadeOutAndPause() }
+            return
+        }
+        guard let index = queue.nextIndex(repeatMode: repeatMode, automatic: automatic) else {
+            if automatic { Task { await fadeOutAndPause() } }
+            return
+        }
+        if automatic && repeatMode == .one && index == queue.currentIndex {
+            seek(to: 0)
+            if !isPlaying {
+                player.playImmediately(atRate: rate)
+                isPlaying = true
+            }
+            publishNowPlaying(force: true)
+            return
+        }
+        updateQueue { $0.jump(to: index) }
+        guard let id = queue.current, let track = library.track(id: id) else { return }
+        transitionTo(track)
+    }
+
+    func playPrevious() {
+        if currentTime > 3 {
+            seek(to: 0)
+            return
+        }
+        guard let index = queue.previousIndex(repeatMode: repeatMode) else {
+            seek(to: 0)
+            return
+        }
+        updateQueue { $0.jump(to: index) }
+        guard let id = queue.current, let track = library.track(id: id) else { return }
+        transitionTo(track)
+    }
+
+    func seek(to time: TimeInterval) {
+        let upper = duration > 0 ? duration : max(time, 0)
+        let clamped = min(max(0, time), upper)
+        currentTime = clamped
+        player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        publishNowPlaying(force: true)
+    }
+
+    func toggleShuffle() {
+        shuffle.toggle()
+        updateQueue { $0.setShuffle(shuffle) }
+    }
+
+    func cycleRepeat() { repeatMode = repeatMode.next }
+
+    func setRate(_ value: Float) {
+        let clamped = min(2, max(0.5, (value * 20).rounded() / 20))
+        rate = clamped
+        settings.playbackRate = clamped
+        if isPlaying { player.rate = clamped }
+        publishNowPlaying(force: true)
+    }
+
+    func toggleAB() {
+        guard current != nil else { return }
+        if loopA == nil {
+            loopA = currentTime
+            loopB = nil
+        } else if loopB == nil {
+            var start = loopA ?? 0
+            var end = currentTime
+            if end < start { swap(&start, &end) }
+            if end - start < 0.5 { end = min(duration > 0 ? duration : start + 0.5, start + 0.5) }
+            loopA = start
+            loopB = end
+        } else {
+            loopA = nil
+            loopB = nil
+        }
+    }
+
+    func queueNext(_ track: Track) {
+        guard current != nil else {
+            play(track, in: library.tracks)
+            return
+        }
+        updateQueue { $0.playNext(track.id) }
+    }
+
+    func queueAppend(_ track: Track) {
+        guard current != nil else {
+            play(track, in: library.tracks)
+            return
+        }
+        updateQueue { $0.append(track.id) }
+    }
+
+    func moveUpcoming(from offsets: IndexSet, to destination: Int) {
+        updateQueue { $0.moveUpcoming(fromOffsets: offsets, toOffset: destination) }
+    }
+
+    func removeUpcoming(at offsets: IndexSet) {
+        updateQueue { $0.removeUpcoming(atOffsets: offsets) }
+    }
+
+    func clearUpcoming() { updateQueue { $0.clearUpcoming() } }
+
+    func jumpUpcoming(_ track: Track) {
+        guard queue.items.contains(track.id) else {
+            play(track, in: library.tracks)
+            return
+        }
+        updateQueue { $0.jump(toID: track.id) }
+        transitionTo(track)
+    }
+
+    func startSleep(minutes: Int) {
+        sleepAfterCurrent = false
+        sleepDeadline = Date().addingTimeInterval(Double(minutes) * 60)
+        armSleep()
+    }
+
+    func sleepAtEndOfTrack() {
+        sleepTask?.cancel()
+        sleepDeadline = nil
+        sleepAfterCurrent = true
+    }
+
+    func cancelSleep() {
+        sleepDeadline = nil
+        sleepAfterCurrent = false
+        sleepTask?.cancel()
+    }
+
+    func stop() {
+        halt()
+        queue = PlayQueue()
+    }
+
+    private func transitionTo(_ track: Track) {
+        transition?.cancel()
+        transition = Task { @MainActor in
+            if self.isPlaying { await self.ramp(to: 0, duration: 0.12) }
+            if Task.isCancelled { return }
+            self.begin(track, fadeIn: true)
+            await self.ramp(to: 1, duration: 0.16)
+        }
+    }
+
+    private func begin(_ track: Track, fadeIn: Bool) {
         activateSession()
         let url = library.fileURL(for: track)
         guard FileManager.default.fileExists(atPath: url.path) else {
@@ -81,118 +267,77 @@ final class PlayerModel: ObservableObject {
         current = track
         duration = track.duration
         currentTime = 0
+        loopA = nil
+        loopB = nil
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
-        player.play()
+        player.volume = fadeIn ? 0 : 1
+        player.playImmediately(atRate: rate)
         isPlaying = true
+        library.markPlayed(track.id)
         publishNowPlaying(force: true)
     }
 
-    func toggle() {
-        if current == nil {
-            let list = activeQueue
-            if let first = list.first { play(first) }
-            return
-        }
-        if isPlaying {
-            player.pause()
-            isPlaying = false
-        } else {
-            player.play()
-            isPlaying = true
-        }
+    private func fadeOutAndPause() async {
+        await ramp(to: 0, duration: 0.18)
+        if Task.isCancelled { return }
+        player.pause()
+        player.volume = 1
+        isPlaying = false
         publishNowPlaying(force: true)
     }
 
-    func playNext(automatic: Bool) {
-        let list = activeQueue
-        guard let current, let index = list.firstIndex(where: { $0.id == current.id }) else {
-            if let first = list.first { play(first) }
-            return
-        }
-        if automatic && repeatMode == .one {
-            seek(to: 0)
-            player.play()
-            isPlaying = true
-            publishNowPlaying(force: true)
-            return
-        }
-        let next = index + 1
-        if next < list.count {
-            play(list[next])
-        } else if repeatMode == .all || (!automatic && repeatMode == .one) {
-            play(list[0])
-        } else {
-            player.pause()
-            isPlaying = false
-            publishNowPlaying(force: true)
-        }
-    }
-
-    func playPrevious() {
-        if currentTime > 3 {
-            seek(to: 0)
-            return
-        }
-        let list = activeQueue
-        guard let current, let index = list.firstIndex(where: { $0.id == current.id }) else { return }
-        let previous = index - 1
-        if previous >= 0 {
-            play(list[previous])
-        } else if repeatMode == .all, let last = list.last {
-            play(last)
-        } else {
-            seek(to: 0)
-        }
-    }
-
-    func seek(to time: TimeInterval) {
-        let upper = duration > 0 ? duration : max(time, 0)
-        let clamped = min(max(0, time), upper)
-        currentTime = clamped
-        let cm = CMTime(seconds: clamped, preferredTimescale: 600)
-        player.seek(to: cm, toleranceBefore: .zero, toleranceAfter: .zero)
-        publishNowPlaying(force: true)
-    }
-
-    func toggleShuffle() {
-        shuffle.toggle()
-        if shuffle { reshuffle(keepingCurrentFirst: true) }
-    }
-
-    func cycleRepeat() {
-        switch repeatMode {
-        case .off: repeatMode = .all
-        case .all: repeatMode = .one
-        case .one: repeatMode = .off
-        }
-    }
-
-    func stop() {
+    private func halt() {
+        transition?.cancel()
         player.pause()
         player.replaceCurrentItem(with: nil)
+        player.volume = 1
         current = nil
         isPlaying = false
         currentTime = 0
         duration = 0
+        loopA = nil
+        loopB = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
-    private var activeQueue: [Track] {
-        shuffle ? shuffledQueue : queue
+    private func ramp(to target: Float, duration: TimeInterval) async {
+        let start = player.volume
+        let steps = 6
+        for step in 1...steps {
+            if Task.isCancelled { return }
+            let amount = Float(step) / Float(steps)
+            player.volume = start + (target - start) * amount
+            try? await Task.sleep(nanoseconds: UInt64(duration / Double(steps) * 1_000_000_000))
+        }
+        if !Task.isCancelled { player.volume = target }
     }
 
-    private func reshuffle(keepingCurrentFirst: Bool) {
-        guard let current, keepingCurrentFirst else {
-            shuffledQueue = queue.shuffled()
-            return
+    @discardableResult
+    private func updateQueue<T>(_ body: (inout PlayQueue) -> T) -> T {
+        var copy = queue
+        let result = body(&copy)
+        queue = copy
+        return result
+    }
+
+    private func armSleep() {
+        sleepTask?.cancel()
+        sleepTask = Task { @MainActor in
+            while let deadline = self.sleepDeadline {
+                if Task.isCancelled { return }
+                if deadline.timeIntervalSinceNow <= 0 {
+                    self.sleepDeadline = nil
+                    await self.fadeOutAndPause()
+                    return
+                }
+                try? await Task.sleep(nanoseconds: 500_000_000)
+            }
         }
-        let rest = queue.filter { $0.id != current.id }.shuffled()
-        shuffledQueue = [current] + rest
     }
 
     private func installObservers() {
         timeObserver = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
+            forInterval: CMTime(seconds: 0.4, preferredTimescale: 600),
             queue: .main
         ) { [weak self] time in
             Task { @MainActor in
@@ -201,6 +346,9 @@ final class PlayerModel: ObservableObject {
                 if let item = self.player.currentItem {
                     let seconds = item.duration.seconds
                     if seconds.isFinite, seconds > 0 { self.duration = seconds }
+                }
+                if let start = self.loopA, let end = self.loopB, end > start, self.currentTime >= end {
+                    self.seek(to: start)
                 }
                 self.publishNowPlaying(force: false)
             }
@@ -225,9 +373,10 @@ final class PlayerModel: ObservableObject {
                 guard let self else { return }
                 if type == .began {
                     self.isPlaying = false
+                    self.player.volume = 1
                     self.publishNowPlaying(force: true)
                 } else if AVAudioSession.InterruptionOptions(rawValue: optionRaw).contains(.shouldResume) {
-                    self.player.play()
+                    self.player.playImmediately(atRate: self.rate)
                     self.isPlaying = true
                     self.publishNowPlaying(force: true)
                 }
@@ -250,15 +399,11 @@ final class PlayerModel: ObservableObject {
         center.previousTrackCommand.isEnabled = true
         center.changePlaybackPositionCommand.isEnabled = true
         center.playCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                if self?.isPlaying == false { self?.toggle() }
-            }
+            Task { @MainActor in if self?.isPlaying == false { self?.toggle() } }
             return .success
         }
         center.pauseCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                if self?.isPlaying == true { self?.toggle() }
-            }
+            Task { @MainActor in if self?.isPlaying == true { self?.toggle() } }
             return .success
         }
         center.togglePlayPauseCommand.addTarget { [weak self] _ in
@@ -275,8 +420,8 @@ final class PlayerModel: ObservableObject {
         }
         center.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            let time = event.positionTime
-            Task { @MainActor in self?.seek(to: time) }
+            let position = event.positionTime
+            Task { @MainActor in self?.seek(to: position) }
             return .success
         }
     }
@@ -293,7 +438,7 @@ final class PlayerModel: ObservableObject {
             MPMediaItemPropertyArtist: current.artist,
             MPMediaItemPropertyPlaybackDuration: duration > 0 ? duration : current.duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
-            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? Double(rate) : 0
         ]
         if let cover = library.coverURL(for: current), let image = UIImage(contentsOfFile: cover.path) {
             info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }

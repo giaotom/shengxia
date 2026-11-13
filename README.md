@@ -1,8 +1,10 @@
 # 声匣
 
-给 Tom 自己用的 iPhone 音轨匣。粘贴哔哩哔哩、抖音或 YouTube 的**公开视频**链接，在手机上解析、下载整条音轨，存进本机资料库播放。没有服务器，没有账号，也不会绕过大会员、会员专享或年龄限制，也不做人声分离。
+给 Tom 自己用的 iPhone 音轨匣，版本 2.0。粘贴哔哩哔哩、抖音或 YouTube 的**公开视频**链接，在手机上解析、下载整条音轨，存进本机资料库播放。没有服务器，没有账号，也不会绕过大会员、会员专享或年龄限制，也不做人声分离。
 
-界面是简体中文。系统要求 iOS 16 及以上（在 iPhone 15 Pro 上使用）。
+界面是简体中文。系统要求 iOS 16 及以上。iOS 26 用系统的 Liquid Glass（悬浮玻璃标签栏、玻璃按钮）；iOS 16 到 25 用同样的布局，材质换成半透明磨砂。
+
+2.0 在三个标签里：**提取**（打开就是这一页）、**资料库**、**歌单**。设置在右上角。资料库可以搜索、按来源筛选、看喜欢的。歌单能新建、改名、删除、加减和排序。播放页有队列、定时、倍速、A-B 循环、喜欢、随机和循环，没有歌词，也没有 AirPlay。还可以剪一段存成新音轨、改标题和封面、批量提取、自动去静音、响度对齐，以及发现同一条视频已经存过。分享菜单里的「声匣」会打开 `shengxia://extract?text=`；这个扩展不依赖 App Group。
 
 ## 能做什么
 
@@ -44,7 +46,7 @@ zip -qry ShengXia-unsigned.ipa Payload
 swift test --package-path Packages/ShengXiaCore
 ```
 
-仓库里的 `.github/workflows/build-ipa.yml` 会在 `macos-latest` 上做同样的事，并把 `ShengXia-unsigned.ipa` 传到 Actions 构件。推到 `main` 或在 Actions 页手动运行即可。
+仓库里的 `.github/workflows/build-ipa.yml` 会在 `macos-26-intel` 上做同样的事，并把 `ShengXia-unsigned.ipa` 传到 Actions 构件。推到 `main` 或在 Actions 页手动运行即可。
 
 ## 用 Windows 装到 iPhone（Sideloadly + 免费 Apple ID）
 
@@ -59,7 +61,8 @@ swift test --package-path Packages/ShengXiaCore
 7. 设置 → 通用 → VPN 与设备管理，信任这个 Apple ID 的证书。
 8. 打开「声匣」。快到第 7 天时再插上电脑，用 Sideloadly 重新安装或刷新。免费账号同时大概只能挂着很少的自签 App，个人用足够。
 9. 锁屏控制：开始播放后按电源键即可，不要把 App 从后台划掉。
-10. 自己的文件：文件 App → 浏览 → 我的 iPhone → 声匣 → Music。
+10. 自己的文件：文件 App → 浏览 → 我的 iPhone → 声匣 → Music。备份的歌单信息在「声匣 / 备份」。
+11. 分享扩展：IPA 里带了一个「声匣」分享按钮，不需要 App Group。免费 Apple ID 有时签不上扩展，Sideloadly 可能因此整包失败。真失败的话，用快捷指令打开 `shengxia://extract?text=` 加上链接，主功能不靠这个扩展。
 
 ## 抖音为什么不稳
 

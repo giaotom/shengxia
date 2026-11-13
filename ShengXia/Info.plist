@@ -45,6 +45,17 @@
   </array>
   <key>UIApplicationSupportsIndirectInputEvents</key>
   <true/>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.giaotom.shengxia</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>shengxia</string>
+      </array>
+    </dict>
+  </array>
   <key>NSAppTransportSecurity</key>
   <dict>
     <key>NSAllowsArbitraryLoads</key>

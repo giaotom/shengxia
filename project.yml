@@ -11,8 +11,8 @@ settings:
     SWIFT_STRICT_CONCURRENCY: minimal
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
     TARGETED_DEVICE_FAMILY: "1"
-    MARKETING_VERSION: "1.1.0"
-    CURRENT_PROJECT_VERSION: "2"
+    MARKETING_VERSION: "2.0.0"
+    CURRENT_PROJECT_VERSION: "3"
     CODE_SIGN_STYLE: Manual
     CODE_SIGNING_ALLOWED: NO
     CODE_SIGNING_REQUIRED: NO
@@ -32,6 +32,9 @@ targets:
           - Info.plist
     dependencies:
       - package: ShengXiaCore
+      - target: ShengXiaShare
+        embed: true
+        codeSign: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.giaotom.shengxia
@@ -45,11 +48,33 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGN_IDENTITY: ""
+  ShengXiaShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShengXiaShare
+        excludes:
+          - Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.giaotom.shengxia.share
+        PRODUCT_NAME: ShengXiaShare
+        INFOPLIST_FILE: ShengXiaShare/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        DEVELOPMENT_TEAM: ""
+        SKIP_INSTALL: NO
+        APPLICATION_EXTENSION_API_ONLY: YES
+        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
 schemes:
   ShengXia:
     build:
       targets:
         ShengXia: all
+        ShengXiaShare: all
     run:
       config: Debug
     archive:

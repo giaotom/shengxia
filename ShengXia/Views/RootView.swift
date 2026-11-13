@@ -1,163 +1,173 @@
+import ShengXiaCore
 import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var library: LibraryStore
     @EnvironmentObject private var player: PlayerModel
     @EnvironmentObject private var importer: ImportController
+    @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var shell: ShellState
     @Environment(\.scenePhase) private var scenePhase
-    @State private var showPlayer = false
-    @State private var pendingDelete: Track?
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                SX.paper.ignoresSafeArea()
-                List {
-                    Section {
-                        header
-                        PasteCard()
-                        if let request = importer.webRequest {
-                            DouyinCapturePanel(request: request)
-                        }
-                    }
-                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(Color.clear)
-
-                    if library.tracks.isEmpty {
-                        Section {
-                            EmptyLibrary()
-                        }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    } else {
-                        Section {
-                            HStack {
-                                Text("资料库")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundStyle(SX.ink)
-                                Spacer()
-                                Text("\(library.tracks.count) 首")
-                                    .font(.caption)
-                                    .foregroundStyle(SX.brass)
-                            }
-                            ForEach(library.tracks) { track in
-                                TrackRow(track: track) {
-                                    player.play(track)
-                                }
-                                .swipeActions {
-                                    Button("删除", role: .destructive) {
-                                        pendingDelete = track
-                                    }
-                                }
-                                .contextMenu {
-                                    Button("删除", role: .destructive) {
-                                        pendingDelete = track
-                                    }
-                                }
-                            }
-                        }
-                        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .refreshable {
-                    await library.refreshFromDisk()
-                }
-            }
-            .navigationBarHidden(true)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if player.current != nil {
-                    MiniPlayer(onOpen: { showPlayer = true })
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 8)
-                }
-            }
-            .sheet(isPresented: $showPlayer) {
-                PlayerScreen(onDelete: { track in
-                    showPlayer = false
-                    pendingDelete = track
-                })
-                .presentationDragIndicator(.visible)
-            }
-            .confirmationDialog(
-                "删除这首？",
-                isPresented: Binding(
-                    get: { pendingDelete != nil },
-                    set: { if !$0 { pendingDelete = nil } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button("删除", role: .destructive) {
-                    if let track = pendingDelete {
-                        if player.current?.id == track.id { player.stop() }
-                        library.delete(track)
-                    }
-                    pendingDelete = nil
-                }
-                Button("取消", role: .cancel) { pendingDelete = nil }
-            } message: {
-                Text("音轨和封面会从这台 iPhone 的「文件」App 里去掉。")
-            }
-            .task {
-                player.activateSession()
-                await library.bootstrap()
-                player.syncQueue(library.tracks)
-            }
-            .onChange(of: scenePhase) { phase in
-                guard phase == .active else { return }
-                Task {
-                    await library.refreshFromDisk()
-                    player.syncQueue(library.tracks)
-                }
-            }
-            .onChange(of: library.tracks) { tracks in
-                player.syncQueue(tracks)
+        Group {
+            if #available(iOS 26, *) {
+                GlassTabs()
+            } else {
+                FallbackTabs()
             }
         }
         .tint(SX.cinnabar)
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("声匣")
-                .font(.system(size: 40, weight: .semibold, design: .serif))
-                .foregroundStyle(SX.ink)
-            Text("把公开视频的整条音轨留在这台手机上。")
-                .font(.subheadline)
-                .foregroundStyle(SX.ink.opacity(0.68))
-                .fixedSize(horizontal: false, vertical: true)
+        .preferredColorScheme(settings.appearance.scheme)
+        .fullScreenCover(isPresented: $shell.showPlayer) {
+            PlayerScreen()
+                .environmentObject(library)
+                .environmentObject(player)
+                .environmentObject(settings)
+                .environmentObject(shell)
+                .environmentObject(importer)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 12)
+        .sheet(isPresented: $shell.showSettings) {
+            SettingsView()
+                .environmentObject(library)
+                .environmentObject(settings)
+                .environmentObject(shell)
+        }
+        .overlay(alignment: .top) { clipboardBanner }
+        .alert(
+            "有一点问题",
+            isPresented: Binding(get: { library.lastError != nil }, set: { if !$0 { library.lastError = nil } })
+        ) {
+            Button("好") { library.lastError = nil }
+        } message: {
+            Text(library.lastError ?? "")
+        }
+        .task {
+            player.activateSession()
+            await library.bootstrap()
+            player.noteLibrary(library.tracks)
+            await importer.considerClipboard()
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            Task {
+                await library.refreshFromDisk()
+                player.noteLibrary(library.tracks)
+                await importer.considerClipboard()
+            }
+        }
+        .onChange(of: library.tracks) { tracks in
+            player.noteLibrary(tracks)
+        }
+        .onOpenURL { url in
+            guard let text = AppLink.extractText(from: url) else { return }
+            shell.tab = .extract
+            importer.enqueue(text)
+        }
     }
 
+    @ViewBuilder
+    private var clipboardBanner: some View {
+        if let prompt = importer.clipboardPrompt {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("要提取这条吗？")
+                    .font(.headline)
+                    .foregroundStyle(SX.ink)
+                Text(prompt)
+                    .font(.subheadline)
+                    .foregroundStyle(SX.ink.opacity(0.75))
+                    .lineLimit(2)
+                HStack(spacing: 10) {
+                    Button("先不了") { importer.dismissClipboard() }
+                        .sxGlassButton()
+                    Button("提取") {
+                        importer.acceptClipboard()
+                        shell.tab = .extract
+                    }
+                    .sxGlassButton(prominent: true)
+                }
+                .controlSize(.regular)
+            }
+            .padding(16)
+            .sxGlass(cornerRadius: 24)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+        }
+    }
 }
 
-struct EmptyLibrary: View {
+@available(iOS 26, *)
+private struct GlassTabs: View {
+    @EnvironmentObject private var shell: ShellState
+    @EnvironmentObject private var player: PlayerModel
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: "archivebox")
-                .font(.system(size: 28))
-                .foregroundStyle(SX.cinnabar)
-            Text("匣子还是空的")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(SX.ink)
-            Text("粘贴哔哩哔哩、抖音或 YouTube 的视频链接。声匣会把整条音轨存进本机，不会做人声分离，也不会去碰付费音乐库。")
-                .font(.subheadline)
-                .foregroundStyle(SX.ink.opacity(0.7))
-                .fixedSize(horizontal: false, vertical: true)
-            Text("也可以在「文件」App 里打开「声匣 / Music」，放进 mp3、m4a 或 flac。")
-                .font(.footnote)
-                .foregroundStyle(SX.brass)
-                .fixedSize(horizontal: false, vertical: true)
+        TabView(selection: $shell.tab) {
+            Tab("提取", systemImage: AppTab.extract.symbol, value: AppTab.extract) {
+                ExtractView()
+            }
+            Tab("资料库", systemImage: AppTab.library.symbol, value: AppTab.library) {
+                LibraryView()
+            }
+            Tab("歌单", systemImage: AppTab.playlists.symbol, value: AppTab.playlists) {
+                PlaylistsView()
+            }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(SX.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .tabViewBottomAccessory {
+            if player.current != nil {
+                MiniPlayerBar(showsGlass: false)
+            }
+        }
+    }
+}
+
+private struct FallbackTabs: View {
+    @EnvironmentObject private var shell: ShellState
+    @EnvironmentObject private var player: PlayerModel
+
+    var body: some View {
+        ZStack {
+            SXBackground()
+            switch shell.tab {
+            case .extract: ExtractView()
+            case .library: LibraryView()
+            case .playlists: PlaylistsView()
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 8) {
+            VStack(spacing: 8) {
+                if player.current != nil {
+                    MiniPlayerBar(showsGlass: true)
+                }
+                FallbackTabBar()
+            }
+            .padding(.horizontal, 12)
+        }
+    }
+}
+
+private struct FallbackTabBar: View {
+    @EnvironmentObject private var shell: ShellState
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(AppTab.allCases) { tab in
+                Button { shell.tab = tab } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: tab.symbol)
+                            .font(.body.weight(.semibold))
+                        Text(tab.title)
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .foregroundStyle(shell.tab == tab ? SX.cinnabar : SX.ink.opacity(0.62))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tab.title)
+            }
+        }
+        .padding(.horizontal, 6)
+        .sxGlass(cornerRadius: 28)
     }
 }

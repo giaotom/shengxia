@@ -111,6 +111,27 @@ public struct Track: Codable, Identifiable, Equatable, Hashable, Sendable {
         processingNote = try c.decodeIfPresent(String.self, forKey: .processingNote)
     }
 
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(artist, forKey: .artist)
+        try c.encode(sourceName, forKey: .sourceName)
+        try c.encodeIfPresent(sourceURL, forKey: .sourceURL)
+        try c.encode(relativePath, forKey: .relativePath)
+        try c.encodeIfPresent(coverRelativePath, forKey: .coverRelativePath)
+        try c.encode(duration, forKey: .duration)
+        try c.encode(formatLabel, forKey: .formatLabel)
+        try c.encode(addedAt, forKey: .addedAt)
+        try c.encode(byteCount, forKey: .byteCount)
+        try c.encode(isFavorite, forKey: .isFavorite)
+        try c.encodeIfPresent(sourceKey, forKey: .sourceKey)
+        try c.encode(playCount, forKey: .playCount)
+        try c.encodeIfPresent(lastPlayedAt, forKey: .lastPlayedAt)
+        try c.encodeIfPresent(clippedFrom, forKey: .clippedFrom)
+        try c.encodeIfPresent(processingNote, forKey: .processingNote)
+    }
+
     public var sourceKind: SourceKind { SourceKind(sourceName: sourceName) }
 }
 
@@ -184,6 +205,13 @@ public struct LibraryIndex: Codable, Equatable, Sendable {
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
         tracks = try c.decodeIfPresent([Track].self, forKey: .tracks) ?? []
         playlists = try c.decodeIfPresent([Playlist].self, forKey: .playlists) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(version, forKey: .version)
+        try c.encode(tracks, forKey: .tracks)
+        try c.encode(playlists, forKey: .playlists)
     }
 
     public mutating func pruneDanglingReferences() {
