@@ -230,4 +230,14 @@ final class AudioMathTests: XCTestCase {
         XCTAssertEqual(AudioMath.processingNote(trimmed: 1.24, gainDB: 3.04), "去静音 1.2 秒 · 响度 +3.0 dB")
         XCTAssertNil(AudioMath.processingNote(trimmed: 0, gainDB: 0))
     }
+
+    func testDisplayTitleKeepsTenGraphemes() {
+        XCTAssertEqual(DisplayTitle.shortened("从小被教要吃饱却很少被"), "从小被教要吃饱却很")
+        XCTAssertEqual(DisplayTitle.shortened("大连这座城市"), "大连这座城市")
+        XCTAssertEqual(DisplayTitle.shortened("这个世界会好吗"), "这个世界会好吗")
+        XCTAssertEqual(DisplayTitle.shortened(String(repeating: "🌆", count: 11)), String(repeating: "🌆", count: 10))
+        XCTAssertEqual(DisplayTitle.shortened(String(repeating: "e\u{0301}", count: 12)).count, 10)
+        XCTAssertEqual(DisplayTitle.shortened("  \n"), "未命名音轨")
+        XCTAssertEqual(DisplayTitle.shortened("小猫想吃🍕，2021年"), "小猫想吃🍕，202")
+    }
 }

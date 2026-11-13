@@ -27,15 +27,32 @@ struct SXGlass: ViewModifier {
 
 struct CircleGlass: ViewModifier {
     var active: Bool = false
+    /// Coral fill for the play control. The pause glyph stays white on top.
+    var emphasis: Bool = false
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
-            content.glassEffect(active ? .regular.tint(SX.cinnabar).interactive() : .regular.interactive(), in: .circle)
+            if emphasis {
+                content.glassEffect(.regular.tint(SX.cinnabar).interactive(), in: .circle)
+            } else if active {
+                content
+                    .background(Circle().fill(Color.white.opacity(0.18)))
+                    .glassEffect(.regular.interactive(), in: .circle)
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.95), lineWidth: 1.5))
+            } else {
+                content.glassEffect(.regular.interactive(), in: .circle)
+            }
+        } else if emphasis {
+            content.background(SX.cinnabar, in: Circle())
+        } else if active {
+            content
+                .background(Color.white.opacity(0.18), in: Circle())
+                .overlay(Circle().strokeBorder(Color.white, lineWidth: 1.5))
         } else {
             content
                 .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().strokeBorder(active ? SX.cinnabar.opacity(0.8) : Color.white.opacity(0.28), lineWidth: 0.8))
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.28), lineWidth: 0.8))
         }
     }
 }

@@ -15,6 +15,8 @@ struct TrackRow: View {
                         .font(.body.weight(.semibold))
                         .foregroundStyle(SX.ink)
                         .lineLimit(2)
+                        .truncationMode(.tail)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                     if track.isFavorite {
                         Image(systemName: "heart.fill")
                             .font(.caption2)

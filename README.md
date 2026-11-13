@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/AppIcon.png" width="148" alt="声匣图标：琥珀色玻璃匣子，里面是一道声波">
+  <img src="docs/AppIcon.png" width="148" alt="声匣图标：白色磨砂玻璃底，中间是琥珀色声波匣">
 </p>
 
 <h1 align="center">声匣</h1>
@@ -18,11 +18,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/giaotom/shengxia/releases/download/v2.0.0/ShengXia-2.0.0-unsigned.ipa"><img alt="下载 ShengXia 2.0.0 未签名 IPA" src="https://img.shields.io/badge/下载-ShengXia--2.0.0--unsigned.ipa-C23A2E?style=for-the-badge"></a>
+  <a href="https://github.com/giaotom/shengxia/releases/download/v2.0.1/ShengXia-2.0.1-unsigned.ipa"><img alt="下载 ShengXia 2.0.1 未签名 IPA" src="https://img.shields.io/badge/下载-ShengXia--2.0.1--unsigned.ipa-C23A2E?style=for-the-badge"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/giaotom/shengxia/releases/tag/v2.0.0">发布页 v2.0.0</a>
+  <a href="https://github.com/giaotom/shengxia/releases/tag/v2.0.1">发布页 v2.0.1</a>
   · 简体中文 · 只做 iPhone · 没有服务器，也没有账号
 </p>
 
@@ -90,14 +90,14 @@ iOS 26 用系统的 Liquid Glass：底部是悬浮的玻璃标签栏，迷你播
 
 ## 📲 用 Sideloadly 装到 iPhone
 
-已签名的包不会放上来。[v2.0.0 发布页](https://github.com/giaotom/shengxia/releases/tag/v2.0.0) 里的 `ShengXia-2.0.0-unsigned.ipa` 没有签名，Sideloadly 会用你自己的 Apple ID 重新签名。同一页还有图标和 `SHA256SUMS.txt`。
+已签名的包不会放上来。[v2.0.1 发布页](https://github.com/giaotom/shengxia/releases/tag/v2.0.1) 里的 `ShengXia-2.0.1-unsigned.ipa` 没有签名，Sideloadly 会用你自己的 Apple ID 重新签名。同一页还有图标和 `SHA256SUMS.txt`。
 
 免费 Apple ID 的描述文件大约 **7 天**过期，到期后再插上电脑签一次。免费账号同时能挂的自签 App 很少，个人用一台手机足够。
 
 1. 从 [sideloadly.io](https://sideloadly.io) 安装 Sideloadly。Windows 还需要微软商店里的「Apple 设备」，或 iTunes，电脑才认得到手机。
 2. 用数据线连接 iPhone，在手机上点「信任」。
 3. 打开 Sideloadly，登录你的 Apple ID。开了双重认证时，去 [appleid.apple.com](https://appleid.apple.com) 生成 App 专用密码，不要填账号的主密码。
-4. 把 `ShengXia-2.0.0-unsigned.ipa` 拖进去。Bundle ID 保持 `com.giaotom.shengxia` 即可。点 Start。
+4. 把 `ShengXia-2.0.1-unsigned.ipa` 拖进去。Bundle ID 保持 `com.giaotom.shengxia` 即可。点 Start。
 5. iOS 16 及以上打开开发者模式：设置 → 隐私与安全性 → 开发者模式，按提示重启。
 6. 设置 → 通用 → VPN 与设备管理，信任这个 Apple ID 的证书。
 7. 打开「声匣」。开始播放之后可以锁屏，不要把 App 从后台划掉，锁屏控制才会留着。

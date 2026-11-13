@@ -33,7 +33,6 @@ struct RootView: View {
                 .environmentObject(settings)
                 .environmentObject(shell)
         }
-        .overlay(alignment: .top) { clipboardBanner }
         .overlay {
             if let request = importer.webRequest {
                 DouyinWebRepresentable(request: request, verificationVisible: importer.verificationVisible)
@@ -76,34 +75,6 @@ struct RootView: View {
         }
     }
 
-    @ViewBuilder
-    private var clipboardBanner: some View {
-        if let prompt = importer.clipboardPrompt {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("要提取这条吗？")
-                    .font(.headline)
-                    .foregroundStyle(SX.ink)
-                Text(prompt)
-                    .font(.subheadline)
-                    .foregroundStyle(SX.ink.opacity(0.75))
-                    .lineLimit(2)
-                HStack(spacing: 10) {
-                    Button("先不了") { importer.dismissClipboard() }
-                        .sxGlassButton()
-                    Button("提取") {
-                        importer.acceptClipboard()
-                        shell.tab = .extract
-                    }
-                    .sxGlassButton(prominent: true)
-                }
-                .controlSize(.regular)
-            }
-            .padding(16)
-            .sxGlass(cornerRadius: 24)
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-        }
-    }
 }
 
 @available(iOS 26, *)
@@ -112,6 +83,18 @@ private struct GlassTabs: View {
     @EnvironmentObject private var player: PlayerModel
 
     var body: some View {
+        Group {
+            if player.current != nil {
+                tabs.tabViewBottomAccessory {
+                    MiniPlayerBar(showsGlass: false)
+                }
+            } else {
+                tabs
+            }
+        }
+    }
+
+    private var tabs: some View {
         TabView(selection: $shell.tab) {
             Tab("提取", systemImage: AppTab.extract.symbol, value: AppTab.extract) {
                 ExtractView()
@@ -121,11 +104,6 @@ private struct GlassTabs: View {
             }
             Tab("歌单", systemImage: AppTab.playlists.symbol, value: AppTab.playlists) {
                 PlaylistsView()
-            }
-        }
-        .tabViewBottomAccessory {
-            if player.current != nil {
-                MiniPlayerBar(showsGlass: false)
             }
         }
     }

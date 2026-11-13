@@ -488,7 +488,7 @@ final class ImportController: ObservableObject {
         return try await library.commit(
             audioURL: destination,
             coverURL: savedCover,
-            title: media.title,
+            title: DisplayTitle.shortened(media.title),
             artist: media.author,
             sourceName: media.sourceName,
             sourceURL: media.pageURL,

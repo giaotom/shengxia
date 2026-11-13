@@ -4,11 +4,18 @@ import SwiftUI
 struct ExtractView: View {
     @EnvironmentObject private var importer: ImportController
     @FocusState private var focused: Bool
+    @State private var promptDrag: CGFloat = 0
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if let prompt = importer.clipboardPrompt {
+                        clipboardCard(prompt)
+                            .offset(y: min(0, promptDrag))
+                            .opacity(promptOpacity)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                     header
                     pasteCard
                     if importer.webRequest != nil {
@@ -19,7 +26,9 @@ struct ExtractView: View {
                     }
                 }
                 .padding(.horizontal, 20)
+                .padding(.top, 12)
                 .padding(.bottom, 28)
+                .animation(.easeInOut(duration: 0.32), value: importer.clipboardPrompt)
             }
             .background(SXBackground())
             .scrollDismissesKeyboard(.interactively)
@@ -45,7 +54,68 @@ struct ExtractView: View {
                 .foregroundStyle(SX.ink.opacity(0.68))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 8)
+    }
+
+    private var promptOpacity: Double {
+        promptDrag < 0 ? max(0, 1 + Double(promptDrag) / 160) : 1
+    }
+
+    private func clipboardCard(_ prompt: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("要提取这条吗？")
+                .font(.headline)
+                .foregroundStyle(SX.ink)
+            Text(prompt)
+                .font(.subheadline)
+                .foregroundStyle(SX.ink.opacity(0.75))
+                .lineLimit(2)
+            HStack(spacing: 10) {
+                Button("先不了") { hidePrompt { importer.dismissClipboard() } }
+                    .sxGlassButton()
+                Button("提取") { hidePrompt { importer.acceptClipboard() } }
+                    .sxGlassButton(prominent: true)
+            }
+            .controlSize(.regular)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .sxGlass(cornerRadius: 24)
+        .contentShape(Rectangle())
+        .gesture(promptSwipe)
+        .accessibilityHint("向上滑动可以关掉")
+    }
+
+    private var promptSwipe: some Gesture {
+        DragGesture(minimumDistance: 12, coordinateSpace: .local)
+            .onChanged { value in
+                let travel = value.translation.height
+                guard travel < 0, abs(travel) > abs(value.translation.width) else { return }
+                promptDrag = travel
+            }
+            .onEnded { value in
+                let travel = value.translation.height
+                let shouldHide = travel < -42 && abs(travel) > abs(value.translation.width)
+                if shouldHide {
+                    withAnimation(.easeIn(duration: 0.26)) { promptDrag = -180 }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) {
+                            importer.dismissClipboard()
+                            promptDrag = 0
+                        }
+                    }
+                } else {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { promptDrag = 0 }
+                }
+            }
+    }
+
+    private func hidePrompt(_ change: () -> Void) {
+        withAnimation(.easeInOut(duration: 0.32)) {
+            promptDrag = 0
+            change()
+        }
     }
 
     private var pasteCard: some View {
@@ -84,7 +154,9 @@ struct ExtractView: View {
             status
         }
         .padding(16)
-        .sxGlass(cornerRadius: 24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .environment(\.colorScheme, .light)
     }
 
     @ViewBuilder

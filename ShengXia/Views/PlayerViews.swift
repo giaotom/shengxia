@@ -78,40 +78,43 @@ struct PlayerScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var panel: PlayerPanel?
     @State private var artwork: UIImage?
+    @State private var dragOffset: CGFloat = 0
 
     var body: some View {
-        ZStack {
-            backdrop
-            if let track = player.current {
-                VStack(spacing: 18) {
-                    topBar(track)
-                    Spacer(minLength: 0)
-                    cover(track)
-                    titles(track)
-                    sourceBadge(track)
-                    scrubber
-                    modeRow
-                    transport
-                    actions(track)
-                    if let playbackError = player.playbackError {
-                        Text(playbackError)
-                            .font(.footnote)
-                            .foregroundStyle(.white)
-                            .multilineTextAlignment(.center)
+        GeometryReader { geo in
+            let top = max(geo.safeAreaInsets.top, Self.windowSafeArea.top)
+            let bottom = max(geo.safeAreaInsets.bottom, Self.windowSafeArea.bottom)
+            let width = geo.size.width
+            let height = max(0, geo.size.height - top - bottom)
+            Group {
+                    if let track = player.current {
+                        controls(track, width: width, height: height)
+                    } else {
+                        VStack(spacing: 14) {
+                            Button { dismiss() } label: {
+                                Image(systemName: "chevron.down")
+                                    .font(.body.weight(.bold))
+                                    .frame(width: 40, height: 40)
+                            }
+                            .buttonStyle(.plain)
+                            .modifier(CircleGlass())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityLabel("关闭")
+                            Spacer()
+                            Text("还没有在播的音轨").font(.headline)
+                            Button("关闭") { dismiss() }.sxGlassButton()
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        .foregroundStyle(.white)
                     }
-                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 18)
-                .foregroundStyle(.white)
-            } else {
-                VStack(spacing: 14) {
-                    Text("还没有在播的音轨").font(.headline)
-                    Button("关闭") { dismiss() }.sxGlassButton()
-                }
-                .foregroundStyle(.white)
-            }
+                .frame(width: width, height: height)
+                .position(x: width / 2, y: top + height / 2)
         }
+        .background { backdrop }
+        .offset(y: dragOffset)
+        .ignoresSafeArea()
         .task(id: player.current?.coverRelativePath) { loadArtwork() }
         .sheet(item: $panel) { item in
             switch item {
@@ -124,6 +127,12 @@ struct PlayerScreen: View {
                 if let track = player.current { TrimEditor(track: track) }
             }
         }
+    }
+
+    private static var windowSafeArea: UIEdgeInsets {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let window = scenes.flatMap(\.windows).first(where: \.isKeyWindow) ?? scenes.first?.windows.first
+        return window?.safeAreaInsets ?? .zero
     }
 
     private var backdrop: some View {
@@ -142,6 +151,73 @@ struct PlayerScreen: View {
         .ignoresSafeArea()
     }
 
+    private func controls(_ track: Track, width: CGFloat, height: CGFloat) -> some View {
+        let coverSide = fittedCover(width: width, height: height)
+        return VStack(spacing: 0) {
+            VStack(spacing: 0) {
+                topBar(track)
+                Spacer(minLength: 6)
+                cover(track, side: coverSide)
+                Spacer(minLength: 8)
+                titles(track)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .simultaneousGesture(swipeToDismiss(limitY: .greatestFiniteMagnitude))
+            sourceBadge(track)
+                .padding(.top, 8)
+            scrubber
+                .padding(.top, 10)
+            modeRow
+                .padding(.top, 2)
+            transport
+                .padding(.top, 8)
+            actions(track)
+                .padding(.top, 10)
+            if let playbackError = player.playbackError {
+                Text(playbackError)
+                    .font(.footnote)
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 6)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+        .frame(width: width, height: height, alignment: .top)
+    }
+
+    private func fittedCover(width: CGFloat, height: CGFloat) -> CGFloat {
+        let reserved: CGFloat = 392
+        let available = height - reserved
+        return min(width - 88, 248, max(112, available))
+    }
+
+    private func swipeToDismiss(limitY: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 18, coordinateSpace: .local)
+            .onChanged { value in
+                guard value.startLocation.y < limitY else { return }
+                let travel = value.translation.height
+                guard travel > 0, travel > abs(value.translation.width) else { return }
+                dragOffset = travel
+            }
+            .onEnded { value in
+                let travel = value.translation.height
+                let shouldClose = value.startLocation.y < limitY
+                    && travel > 110
+                    && travel > abs(value.translation.width) * 1.15
+                if shouldClose {
+                    dismiss()
+                } else {
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+                        dragOffset = 0
+                    }
+                }
+            }
+    }
+
     private func topBar(_ track: Track) -> some View {
         HStack {
             Button { dismiss() } label: {
@@ -152,7 +228,7 @@ struct PlayerScreen: View {
             .buttonStyle(.plain)
             .modifier(CircleGlass())
             .accessibilityLabel("关闭")
-            Spacer()
+            Spacer(minLength: 8)
             Menu {
                 Button { panel = .edit } label: { Label("编辑信息", systemImage: "pencil") }
                 Button { panel = .trim } label: { Label("剪一段", systemImage: "scissors") }
@@ -168,34 +244,45 @@ struct PlayerScreen: View {
             .modifier(CircleGlass())
             .accessibilityLabel("更多")
         }
-        .padding(.top, 8)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
     }
 
-    private func cover(_ track: Track) -> some View {
-        CoverThumb(track: track, side: 280, radius: 36)
-            .shadow(color: .black.opacity(0.35), radius: 24, y: 16)
+    private func cover(_ track: Track, side: CGFloat) -> some View {
+        let radius = max(22, side * 0.13)
+        return CoverThumb(track: track, side: side, radius: radius)
+            .shadow(color: .black.opacity(0.35), radius: 18, y: 12)
             .overlay(
-                RoundedRectangle(cornerRadius: 36, style: .continuous)
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
             )
     }
 
     private func titles(_ track: Track) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             Text(track.title)
-                .font(.title2.weight(.bold))
-                .multilineTextAlignment(.center)
+                .font(.title3.weight(.bold))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity)
                 .shadow(color: .black.opacity(0.35), radius: 8, y: 2)
             Text(track.artist)
-                .font(.body)
+                .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.84))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity)
             if track.byteCount > 0 || track.processingNote != nil {
                 Text(detailLine(track))
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.62))
-                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity)
             }
         }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
     }
 
     private func sourceBadge(_ track: Track) -> some View {
@@ -236,15 +323,17 @@ struct PlayerScreen: View {
             .font(.caption.monospacedDigit())
             .foregroundStyle(.white.opacity(0.75))
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var modeRow: some View {
         HStack {
             modeButton("shuffle", "随机播放", player.shuffle) { player.toggleShuffle() }
-            Spacer()
+            Spacer(minLength: 8)
             modeButton(player.repeatMode.symbol, player.repeatMode.title, player.repeatMode != .off) { player.cycleRepeat() }
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity)
     }
 
     private var transport: some View {
@@ -256,13 +345,15 @@ struct PlayerScreen: View {
                     .frame(width: 64, height: 64)
             }
             .buttonStyle(.plain)
-            .modifier(CircleGlass(active: true))
+            .foregroundStyle(.white)
+            .modifier(CircleGlass(emphasis: true))
             .accessibilityLabel(player.isPlaying ? "暂停" : "播放")
             plainTransport("forward.fill", "下一首") { player.playNext(automatic: false) }
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 8)
         .sxCapsuleGlass()
+        .frame(maxWidth: .infinity)
     }
 
     private func actions(_ track: Track) -> some View {
@@ -275,13 +366,15 @@ struct PlayerScreen: View {
             }
             round(track.isFavorite ? "heart.fill" : "heart", "喜欢", track.isFavorite) { library.toggleFavorite(track.id) }
         }
+        .frame(maxWidth: .infinity)
         return Group {
             if #available(iOS 26, *) {
-                GlassEffectContainer(spacing: 10) { row }
+                GlassEffectContainer(spacing: 8) { row }
             } else {
                 row
             }
         }
+        .frame(maxWidth: .infinity)
     }
 
     private func round(_ symbol: String, _ title: String, _ active: Bool, action: @escaping () -> Void) -> some View {
@@ -289,16 +382,19 @@ struct PlayerScreen: View {
             VStack(spacing: 6) {
                 Image(systemName: symbol)
                     .font(.body.weight(.semibold))
-                    .frame(width: 54, height: 54)
+                    .foregroundStyle(Color.white)
+                    .frame(width: 46, height: 46)
                     .modifier(CircleGlass(active: active))
                 Text(title)
                     .font(.caption2)
+                    .foregroundStyle(Color.white.opacity(0.92))
                     .lineLimit(1)
-                    .frame(maxWidth: 64)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity)
             }
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(active ? SX.cinnabar : Color.white)
         .accessibilityLabel(title)
     }
 
@@ -315,7 +411,7 @@ struct PlayerScreen: View {
             Image(systemName: symbol).font(.body.weight(.semibold)).frame(width: 44, height: 36)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(active ? SX.cinnabar : Color.white.opacity(0.7))
+        .foregroundStyle(Color.white.opacity(active ? 1 : 0.62))
         .accessibilityLabel(label)
     }
 
@@ -350,7 +446,7 @@ private struct QueueSheet: View {
             List {
                 if let current = player.current {
                     Section("正在播放") {
-                        Text(current.title).font(.body.weight(.semibold))
+                        Text(current.title).font(.body.weight(.semibold)).lineLimit(1).truncationMode(.tail)
                         Text(current.artist).font(.subheadline).foregroundStyle(.secondary)
                     }
                 }

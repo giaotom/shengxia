@@ -225,7 +225,7 @@ final class LibraryStore: ObservableObject {
                         throw error
                     }
                     _ = try await commit(
-                        audioURL: dest, coverURL: nil, title: title, artist: "本地文件",
+                        audioURL: dest, coverURL: nil, title: DisplayTitle.shortened(title), artist: "本地文件",
                         sourceName: "文件", sourceURL: nil, formatLabel: "M4A（AAC）", duration: 0
                     )
                 } else if audioExtensions.contains(ext) {
@@ -233,7 +233,7 @@ final class LibraryStore: ObservableObject {
                     if fm.fileExists(atPath: dest.path) { try? fm.removeItem(at: dest) }
                     try fm.copyItem(at: url, to: dest)
                     _ = try await commit(
-                        audioURL: dest, coverURL: sidecarCover(for: url), title: title, artist: "本地文件",
+                        audioURL: dest, coverURL: sidecarCover(for: url), title: DisplayTitle.shortened(title), artist: "本地文件",
                         sourceName: "文件", sourceURL: nil, formatLabel: Self.label(for: ext), duration: 0
                     )
                 } else {
@@ -272,7 +272,7 @@ final class LibraryStore: ObservableObject {
             let cover = sidecarCover(for: file)
             let duration = await Self.probeDuration(file)
             tracks.insert(Track(
-                title: title.isEmpty ? "未命名音轨" : title,
+                title: DisplayTitle.shortened(title),
                 artist: "本地文件",
                 sourceName: "文件",
                 relativePath: relative,
