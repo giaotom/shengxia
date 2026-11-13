@@ -6,6 +6,11 @@ on:
     branches:
       - main
       - master
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
   ipa:
@@ -66,3 +71,39 @@ jobs:
           path: ShengXia-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
+
+      - name: Prepare release assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p release
+          cp ShengXia-unsigned.ipa "release/ShengXia-${VERSION}-unsigned.ipa"
+          cp docs/AppIcon.png release/AppIcon.png
+          (
+            cd release
+            shasum -a 256 "ShengXia-${VERSION}-unsigned.ipa" AppIcon.png > SHA256SUMS.txt
+          )
+          NOTES=".github/release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$NOTES" ]; then
+            cp "$NOTES" release-body.md
+          else
+            printf '声匣 %s\n\n未签名安装包。安装步骤见仓库 README。\n' "$GITHUB_REF_NAME" > release-body.md
+          fi
+          cat release/SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 声匣 ${{ github.ref_name }}
+          body_path: release-body.md
+          files: |
+            release/ShengXia-*-unsigned.ipa
+            release/AppIcon.png
+            release/SHA256SUMS.txt
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
+          make_latest: true
+          token: ${{ secrets.GITHUB_TOKEN }}

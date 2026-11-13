@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/giaotom/shengxia/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/giaotom/shengxia?style=flat-square&label=release"></a>
   <a href="https://github.com/giaotom/shengxia/actions/workflows/build-ipa.yml"><img alt="未签名 IPA 构建" src="https://img.shields.io/github/actions/workflow/status/giaotom/shengxia/build-ipa.yml?branch=main&label=unsigned%20IPA&style=flat-square"></a>
   <img alt="需要 iOS 16 或更高" src="https://img.shields.io/badge/iOS-16%2B-000000?style=flat-square&logo=apple&logoColor=white">
   <img alt="Swift 5" src="https://img.shields.io/badge/Swift-5-F05138?style=flat-square&logo=swift&logoColor=white">
@@ -17,7 +18,12 @@
 </p>
 
 <p align="center">
-  版本 2.0.0 · 简体中文 · 只做 iPhone · 没有服务器，也没有账号
+  <a href="https://github.com/giaotom/shengxia/releases/download/v2.0.0/ShengXia-2.0.0-unsigned.ipa"><img alt="下载 ShengXia 2.0.0 未签名 IPA" src="https://img.shields.io/badge/下载-ShengXia--2.0.0--unsigned.ipa-C23A2E?style=for-the-badge"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/giaotom/shengxia/releases/tag/v2.0.0">发布页 v2.0.0</a>
+  · 简体中文 · 只做 iPhone · 没有服务器，也没有账号
 </p>
 
 声匣是一个装在自己手机上的音轨匣。粘贴一条哔哩哔哩、抖音或 YouTube 的公开视频链接，它把**整条音轨**存进本机资料库，然后像一首歌一样播放。封面、进度、锁屏和后台播放都在。不上传任何东西。
@@ -84,14 +90,14 @@ iOS 26 用系统的 Liquid Glass：底部是悬浮的玻璃标签栏，迷你播
 
 ## 📲 用 Sideloadly 装到 iPhone
 
-仓库不提供已签名的安装包。Actions 里的 **Build unsigned IPA** 会在 `macos-26-intel` 上编出一个未签名的 `ShengXia-unsigned.ipa`。未签名的包不能直接装，Sideloadly 会用你自己的 Apple ID 重新签名。
+已签名的包不会放上来。[v2.0.0 发布页](https://github.com/giaotom/shengxia/releases/tag/v2.0.0) 里的 `ShengXia-2.0.0-unsigned.ipa` 没有签名，Sideloadly 会用你自己的 Apple ID 重新签名。同一页还有图标和 `SHA256SUMS.txt`。
 
 免费 Apple ID 的描述文件大约 **7 天**过期，到期后再插上电脑签一次。免费账号同时能挂的自签 App 很少，个人用一台手机足够。
 
 1. 从 [sideloadly.io](https://sideloadly.io) 安装 Sideloadly。Windows 还需要微软商店里的「Apple 设备」，或 iTunes，电脑才认得到手机。
 2. 用数据线连接 iPhone，在手机上点「信任」。
 3. 打开 Sideloadly，登录你的 Apple ID。开了双重认证时，去 [appleid.apple.com](https://appleid.apple.com) 生成 App 专用密码，不要填账号的主密码。
-4. 把 `ShengXia-unsigned.ipa` 拖进去。Bundle ID 保持 `com.giaotom.shengxia` 即可。点 Start。
+4. 把 `ShengXia-2.0.0-unsigned.ipa` 拖进去。Bundle ID 保持 `com.giaotom.shengxia` 即可。点 Start。
 5. iOS 16 及以上打开开发者模式：设置 → 隐私与安全性 → 开发者模式，按提示重启。
 6. 设置 → 通用 → VPN 与设备管理，信任这个 Apple ID 的证书。
 7. 打开「声匣」。开始播放之后可以锁屏，不要把 App 从后台划掉，锁屏控制才会留着。
