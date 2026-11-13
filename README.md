@@ -1,24 +1,134 @@
-# 声匣
+<p align="center">
+  <img src="docs/AppIcon.png" width="148" alt="声匣图标：琥珀色玻璃匣子，里面是一道声波">
+</p>
 
-给 Tom 自己用的 iPhone 音轨匣，版本 2.0。粘贴哔哩哔哩、抖音或 YouTube 的**公开视频**链接，在手机上解析、下载整条音轨，存进本机资料库播放。没有服务器，没有账号，也不会绕过大会员、会员专享或年龄限制，也不做人声分离。
+<h1 align="center">声匣</h1>
 
-界面是简体中文。系统要求 iOS 16 及以上。iOS 26 用系统的 Liquid Glass（悬浮玻璃标签栏、玻璃按钮）；iOS 16 到 25 用同样的布局，材质换成半透明磨砂。
+<p align="center">
+  <strong>把公开视频的整条音轨，留在自己的 iPhone 上。</strong><br>
+  <em>ShengXia — a Liquid Glass player for the audio of a public video.</em>
+</p>
 
-2.0 在三个标签里：**提取**（打开就是这一页）、**资料库**、**歌单**。设置在右上角。资料库可以搜索、按来源筛选、看喜欢的。歌单能新建、改名、删除、加减和排序。播放页有队列、定时、倍速、A-B 循环、喜欢、随机和循环，没有歌词，也没有 AirPlay。还可以剪一段存成新音轨、改标题和封面、批量提取、自动去静音、响度对齐，以及发现同一条视频已经存过。分享菜单里的「声匣」会打开 `shengxia://extract?text=`；这个扩展不依赖 App Group。
+<p align="center">
+  <a href="https://github.com/giaotom/shengxia/actions/workflows/build-ipa.yml"><img alt="未签名 IPA 构建" src="https://img.shields.io/github/actions/workflow/status/giaotom/shengxia/build-ipa.yml?branch=main&label=unsigned%20IPA&style=flat-square"></a>
+  <img alt="需要 iOS 16 或更高" src="https://img.shields.io/badge/iOS-16%2B-000000?style=flat-square&logo=apple&logoColor=white">
+  <img alt="Swift 5" src="https://img.shields.io/badge/Swift-5-F05138?style=flat-square&logo=swift&logoColor=white">
+  <a href="LICENSE"><img alt="MIT 许可证" src="https://img.shields.io/badge/license-MIT-blue?style=flat-square"></a>
+</p>
 
-## 能做什么
+<p align="center">
+  版本 2.0.0 · 简体中文 · 只做 iPhone · 没有服务器，也没有账号
+</p>
 
-- **哔哩哔哩**：完整链接、`b23.tv` 短链、单独的 BV 号，以及带 `?p=` 的分 P。先向公开接口要 `buvid`，再取稿件信息和 DASH 音频流（`fnval=16`），带上 Referer 和浏览器 User-Agent 下载。优先最高码率的 AAC；有 FLAC 就存 FLAC。杜比音轨会跳过。只剩 FLV 时会说明 iPhone 解不了。
-- **抖音**：分享文案、`v.douyin.com` 短链、视频页链接。先跟随跳转拿到视频号，再试分享页和公开的 `iteminfo`。这些接口现在经常不再返回播放地址，这时会在 App 里打开抖音网页（不登录），等页面自己请求到视频地址后再下载，并用系统的 AVFoundation 抽出音轨。
-- **YouTube**：`watch?v=`、`youtu.be`、`/shorts/`、`m.youtube.com`、`music.youtube.com`，以及夹在分享文案里的链接。手机直接请求 InnerTube `/youtubei/v1/player`（VISIONOS，失败再试 ANDROID_VR 1.65.10 和 iOS），只要返回没加密的音频地址就下载。优先 AAC itag 140，存成 M4A。不解签名，也不做 PO Token。私密、会员专享和年龄限制会直接说明，不会绕过。连不上时提示检查代理；只返回风控页时提示解析失败。WebM/Opus 在 iPhone 上播不了，所以不会拿它当结果。
-- 格式标清楚。iPhone 没有系统自带的 MP3 编码器，所以新保存的音轨是 **M4A（AAC）** 或源站给出的 **FLAC**。你放进文件夹的 MP3 会保持 MP3。
-- 资料库：封面、播放/暂停、上一首/下一首、拖动进度、随机、循环、删除。
-- 后台播放和锁屏控制（`AVAudioSession.playback`、`UIBackgroundModes: audio`、Now Playing、远程命令）。
-- 「文件」App 里能看到 `声匣/Music`。把 mp3、m4a、flac 放进去，回到声匣下拉即可收进资料库。
+声匣是一个装在自己手机上的音轨匣。粘贴一条哔哩哔哩、抖音或 YouTube 的公开视频链接，它把**整条音轨**存进本机资料库，然后像一首歌一样播放。封面、进度、锁屏和后台播放都在。不上传任何东西。
 
-## 在 Mac 上编译未签名 IPA
+---
 
-需要 Xcode 15 或更新，以及 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。
+## ✨ 打开就是提取
+
+没有单独的首页。三个标签从左到右是 **提取**、**资料库**、**歌单**。设置是右上角一颗小齿轮。
+
+iOS 26 用系统的 Liquid Glass：底部是悬浮的玻璃标签栏，迷你播放器贴在标签栏上方。iOS 16 到 25 用同一套布局，玻璃换成半透明磨砂，所以旧系统也不会变成一套残缺界面。
+
+从别的 App 复制一条链接再回到声匣，顶部会问一句「要提取这条吗？」。分享菜单里如果出现「声匣」，点一下也会把链接送进来。扩展不依赖 App Group。签不上扩展时，用快捷指令打开 `shengxia://extract?text=` 加上链接，主功能照样可用。
+
+## 🎧 正在播放
+
+播放页是一张铺满屏幕的封面：模糊的背景、大圆角专辑图、来源胶囊，下面是一条玻璃质感的播放条。
+
+有随机、列表循环、单曲循环、倍速（0.5×–2×）、A-B 循环、睡眠定时（按分钟，或这首播完再停）、下一首和播放队列。暂停和切歌会轻轻淡出。
+
+没有歌词页，也没有 AirPlay。锁屏和耳机线控还在。
+
+## 📚 资料库和歌单
+
+资料库是真正的列表，不是几张卡片。
+
+- 搜索标题、作者和来源
+- 按哔哩哔哩、抖音、YouTube、本地筛选
+- 红心收藏，也可以只看收藏
+- 左滑收藏、加入下一首，或删除
+- 同一条视频再提取时会认出来，可以选择仍然再存一份
+
+歌单可以新建、改名、删除、加入、移出和拖动排序。
+
+剪贴板、文件 App 和分享进来的音频会进同一份资料库。索引是本机的 JSON，不经过账号。
+
+## ✂️ 留下想留的那一段
+
+- **批量提取**：一行一条，排队下载，每一条有自己的进度，失败可以重试
+- **裁剪**：拖动开头和结尾，试听，再导出成一条新音轨
+- **自动处理**：可选去掉首尾静音，也可选把响度对齐到舒适的音量
+- **改信息**：标题、作者、封面。封面可以从相册选；原文件里还留着画面时，也可以抓一帧
+- **回到原视频**：从资料库或播放页打开来源链接
+- **音质**：设置里可选较高、标准或更小。这个选择目前主要影响哔哩哔哩的音频流
+
+新保存的音轨是 **M4A（AAC）**，哔哩哔哩给出 FLAC 时会保留 FLAC。手机没有系统的 MP3 编码器，所以声匣不会把音轨转成 MP3。你自己放进文件夹的 MP3 会原样留着。
+
+## 📺 支持的来源
+
+| 来源 | 可以粘贴 | 声匣会怎么做 |
+| --- | --- | --- |
+| 哔哩哔哩 | 视频链接、`b23.tv`、单独的 BV 号、带 `?p=` 的分 P | 读取公开的稿件信息和音频流。优先 AAC，有 FLAC 就存 FLAC。杜比音轨跳过。只剩 FLV 时会说明 iPhone 解不了 |
+| 抖音 | 分享文案、`v.douyin.com` 短链、视频页 | 先试公开接口。接口不再给地址时，打开抖音自己的网页把视频地址接过来，再抽出音轨。滑块验证会以接近全屏的页面出现，滑块放大并滚到中间，可以双指再放大，通过后自动继续。图文作品没有音轨，会直接说明 |
+| YouTube | `watch`、`youtu.be`、Shorts，以及 `m.` 和 Music 链接 | 只要站点返回了没有加密的 AAC 音轨就下载。私密、会员专享、年龄限制和直播会说明原因，不会绕过。手机连不上时，提示检查代理 |
+| 本地 | 文件 App 里的 mp3、m4a、flac、wav，或一部带音轨的视频 | 音频直接收进资料库。视频会抽出音轨再保存 |
+
+## 📸 界面预览
+
+模拟器截图还没放进仓库。三张主界面会补在下面这张表里。
+
+| 提取 | 资料库 | 正在播放 |
+| :---: | :---: | :---: |
+| 待补充 | 待补充 | 待补充 |
+
+## 📲 用 Sideloadly 装到 iPhone
+
+仓库不提供已签名的安装包。Actions 里的 **Build unsigned IPA** 会在 `macos-26-intel` 上编出一个未签名的 `ShengXia-unsigned.ipa`。未签名的包不能直接装，Sideloadly 会用你自己的 Apple ID 重新签名。
+
+免费 Apple ID 的描述文件大约 **7 天**过期，到期后再插上电脑签一次。免费账号同时能挂的自签 App 很少，个人用一台手机足够。
+
+1. 从 [sideloadly.io](https://sideloadly.io) 安装 Sideloadly。Windows 还需要微软商店里的「Apple 设备」，或 iTunes，电脑才认得到手机。
+2. 用数据线连接 iPhone，在手机上点「信任」。
+3. 打开 Sideloadly，登录你的 Apple ID。开了双重认证时，去 [appleid.apple.com](https://appleid.apple.com) 生成 App 专用密码，不要填账号的主密码。
+4. 把 `ShengXia-unsigned.ipa` 拖进去。Bundle ID 保持 `com.giaotom.shengxia` 即可。点 Start。
+5. iOS 16 及以上打开开发者模式：设置 → 隐私与安全性 → 开发者模式，按提示重启。
+6. 设置 → 通用 → VPN 与设备管理，信任这个 Apple ID 的证书。
+7. 打开「声匣」。开始播放之后可以锁屏，不要把 App 从后台划掉，锁屏控制才会留着。
+
+自己的文件在「文件」→ 浏览 → 我的 iPhone → 声匣 → Music。导出的资料库备份在「声匣 / 备份」。
+
+**分享扩展的注意点。** IPA 里带了一个「声匣」分享按钮，它没有 App Group。较新的 Sideloadly 通常会一起签名。免费 Apple ID 有时签不上扩展，整包安装会因此失败。真失败的话，扩展可以不要：主 App 的提取、资料库和播放不依赖它，用快捷指令打开下面这条链接即可。
+
+```text
+shengxia://extract?text=这里放视频链接
+```
+
+## 🧩 插件，还在路上
+
+2.0 的提取、资料库和播放是做在 App 里面的，还没有插件接口。下面是打算拆出去的方向，方便以后加来源时不用改整棵界面。代码还没开始写。
+
+| 方向 | 想让它负责 |
+| --- | --- |
+| 来源插件 | 一个新的站点只实现「认链接、取公开音轨」 |
+| 处理插件 | 静音修剪、响度、转码，按开关串起来 |
+| 入口插件 | 剪贴板、分享扩展、快捷指令和 `shengxia://` 走同一条队列 |
+| 资料库插件 | 用公开信息补标题、作者和封面 |
+
+不会做的事情也写在这里：不绕过会员和 DRM，不做人声分离，不加歌词页。
+
+## 🛠 技术栈
+
+- SwiftUI，部署目标 iOS 16，只编译 iPhone
+- iOS 26 的 Liquid Glass（`.glassEffect`、悬浮标签栏）；更早的系统用 `ultraThinMaterial`
+- `ShengXiaCore`：链接识别、来源解析、资料库和播放队列，用 Swift Package 做单元测试
+- AVFoundation 负责下载后的音轨、裁剪、响度和播放
+- WebKit 只在抖音需要打开网页时用
+- 资料库是 Application Support 里的 Codable JSON
+- 工程用 [XcodeGen](https://github.com/yonaskolb/XcodeGen) 从 `project.yml` 生成
+- 未签名 IPA 由 GitHub Actions 在 `macos-26-intel` 上构建
+
+本地编译：
 
 ```bash
 brew install xcodegen
@@ -29,45 +139,27 @@ xcodebuild \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   -sdk iphoneos \
-  -derivedDataPath build \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
   DEVELOPMENT_TEAM="" \
   build
-APP=build/Build/Products/Release-iphoneos/ShengXia.app
-rm -rf Payload && mkdir Payload && cp -R "$APP" Payload/
-zip -qry ShengXia-unsigned.ipa Payload
 ```
 
-纯逻辑测试不需要 Mac：
+只跑核心测试，不需要 Mac：
 
 ```bash
 swift test --package-path Packages/ShengXiaCore
 ```
 
-仓库里的 `.github/workflows/build-ipa.yml` 会在 `macos-26-intel` 上做同样的事，并把 `ShengXia-unsigned.ipa` 传到 Actions 构件。推到 `main` 或在 Actions 页手动运行即可。
+## ⚠️ 声明
 
-## 用 Windows 装到 iPhone（Sideloadly + 免费 Apple ID）
+声匣是个人学习项目，用来理解公开网页如何暴露音轨，以及如何在 iPhone 上做一个离线播放器。
 
-未签名的 IPA 不能直接装。Sideloadly 会用你的 Apple ID 重新签名。免费 Apple ID 的描述文件大约 **7 天**过期，过期后要再签一次。
+请只提取你有权保存的公开内容，并遵守哔哩哔哩、抖音、YouTube 和当地版权法。声匣**不会**绕过大会员、会员专享、付费墙、DRM 或年龄限制，也**不会**做人声分离。需要登录或付费才能听的内容，会直接告诉你原因。
 
-1. 从 [sideloadly.io](https://sideloadly.io) 安装 Sideloadly。
-2. 安装微软商店里的「Apple 设备」，或安装 iTunes，好让电脑有 Apple Mobile Device 驱动。
-3. 用数据线连接 iPhone 15 Pro，在手机上点「信任」。
-4. 打开 Sideloadly，用免费 Apple ID 登录。开了双重认证的话，到 [appleid.apple.com](https://appleid.apple.com) 生成 App 专用密码，不要把主密码填进去。
-5. 把 `ShengXia-unsigned.ipa` 拖进去。Bundle ID 可以保持 `com.giaotom.shengxia`。点 Start。
-6. iOS 16 及以上要打开开发者模式：设置 → 隐私与安全性 → 开发者模式，按提示重启。
-7. 设置 → 通用 → VPN 与设备管理，信任这个 Apple ID 的证书。
-8. 打开「声匣」。快到第 7 天时再插上电脑，用 Sideloadly 重新安装或刷新。免费账号同时大概只能挂着很少的自签 App，个人用足够。
-9. 锁屏控制：开始播放后按电源键即可，不要把 App 从后台划掉。
-10. 自己的文件：文件 App → 浏览 → 我的 iPhone → 声匣 → Music。备份的歌单信息在「声匣 / 备份」。
-11. 分享扩展：IPA 里带了一个「声匣」分享按钮，不需要 App Group。免费 Apple ID 有时签不上扩展，Sideloadly 可能因此整包失败。真失败的话，用快捷指令打开 `shengxia://extract?text=` 加上链接，主功能不靠这个扩展。
+MIT 许可只覆盖这份源代码。它不授予任何视频、音频或封面的权利。
 
-## 抖音为什么不稳
+## 📄 许可
 
-2026 年 11 月实测，抖音分享页的 `window._ROUTER_DATA` 里已经没有 `videoInfoRes` / `play_addr`。`iteminfo` 匿名请求经常是空 body，详情接口会要页面自己生成的校验。声匣不会去伪造这套签名。它只做两件事：能从公开数据里直接读到地址就下载；读不到就打开抖音自己的网页，把页面要到的视频地址接下来。抖音一改页面，就会看到「抖音解析失败，可能是抖音更新了校验」。图文作品没有视频音轨，会直接说明，不会去扒背景音乐。
-
-## YouTube 为什么会失败
-
-2026 年 11 月，VISIONOS 客户端对一部分公开视频仍会返回可直接下载的 AAC（itag 140），整段文件可以下完。同一出口上，另一些视频会得到 `LOGIN_REQUIRED` / “Sign in to confirm you're not a bot”，声匣不会去伪造 PO Token，而是换 ANDROID_VR 和 iOS 再试一次，还不行就提示「YouTube 解析失败，可能是风控更新」。手机在国内打不开 YouTube 时，提示「YouTube 连接失败，请确认手机已开启代理」。
+源码以 [MIT](LICENSE) 许可发布。Copyright (c) 2026 giaotom.
