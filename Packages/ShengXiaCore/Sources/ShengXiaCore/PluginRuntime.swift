@@ -209,9 +209,9 @@ public final class PluginEngine: @unchecked Sendable {
     public var openURLHandler: (@Sendable (String) -> Void)?
 
     private let network: [String]
-    private let vendors: [String: String]
-    private let thread = PluginLoop()
-    private var context: JSContext?
+    fileprivate let vendors: [String: String]
+    fileprivate let thread = PluginLoop()
+    fileprivate var context: JSContext?
     private var session: URLSession!
     private var nextBodyLimit = 4_000_000
 
@@ -369,7 +369,7 @@ public final class PluginEngine: @unchecked Sendable {
     }
 
     fileprivate func startFetch(id: Int, json: String) {
-        guard let context else { return }
+        guard context != nil else { return }
         guard let data = json.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let urlString = object["url"] as? String,
@@ -558,7 +558,7 @@ private final class PluginLoop: Thread {
         loop = CFRunLoopGetCurrent()
         started.signal()
         while !isCancelled {
-            _ = CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.5, false)
+            _ = CFRunLoopRunInMode(.defaultMode, 0.5, false)
         }
     }
 
@@ -569,7 +569,7 @@ private final class PluginLoop: Thread {
         }
         started.wait()
         guard let loop else { return }
-        CFRunLoopPerformBlock(loop, kCFRunLoopDefaultMode, block)
+        CFRunLoopPerformBlock(loop, CFRunLoopMode.defaultMode.rawValue, block)
         CFRunLoopWakeUp(loop)
     }
 
