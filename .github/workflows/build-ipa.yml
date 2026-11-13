@@ -23,7 +23,25 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Test core logic
-        run: swift test --package-path Packages/ShengXiaCore
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          # Plugin-engine tests skip themselves when CI=true. This kill is the
+          # backstop so a stuck JavaScriptCore thread cannot hold the runner.
+          python3 - << 'PY'
+          import os, signal, subprocess, sys
+          proc = subprocess.Popen(
+              ["swift", "test", "--package-path", "Packages/ShengXiaCore"],
+              start_new_session=True,
+          )
+          try:
+              code = proc.wait(timeout=300)
+          except subprocess.TimeoutExpired:
+              os.killpg(proc.pid, signal.SIGKILL)
+              print("swift test exceeded 5 minutes and was killed", file=sys.stderr)
+              sys.exit(1)
+          sys.exit(code)
+          PY
 
       - name: Install XcodeGen
         run: brew install xcodegen
